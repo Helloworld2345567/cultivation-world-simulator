@@ -26,7 +26,7 @@ services:
       retries: 3
       start_period: 30s
     volumes:
-      - ./docker-data:/data
+      - "${CWS_DOCKER_DATA_DIR:-./docker-data}:/data"
     networks:
       - backend_private
     security_opt:
@@ -41,7 +41,7 @@ services:
       context: .
       dockerfile: deploy/Dockerfile.frontend
     ports:
-      - "127.0.0.1:8123:80"
+      - "127.0.0.1:${CWS_FRONTEND_PORT:-8123}:80"
     depends_on:
       backend:
         condition: service_healthy

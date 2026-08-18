@@ -65,7 +65,11 @@ Linux 可放到：
 - `CWS_ADMIN_SESSION_SECRET`：至少 32 个字符，用于签名会话，不应与密码相同；建议由密码管理器生成不少于 32 个随机字节后编码得到；
 - `CLOUDFLARE_TUNNEL_TOKEN`：Dashboard 为该 Tunnel 提供的 token。
 
+模板中的三个必需秘密故意留空；在全部填写前，Compose 会拒绝启动。后端也会拒绝 `replace-with-*`、`change-me*` 等常见占位凭据，避免把示例值误当成生产管理员密码。
+
 示例中的 `CWS_ALLOWED_ORIGINS=https://world.ym0v0.com` 不是秘密，但必须与实际 Public Hostname 保持一致。多个可信来源使用逗号分隔；不要填写 `*`。
+
+`CWS_FRONTEND_PORT` 与 `CWS_DOCKER_DATA_DIR` 是可选部署覆盖项；默认仍分别为 `8123` 和 `./docker-data`。常规部署无需修改，隔离 smoke/预演栈时可改用其他回环端口和独立数据目录，避免影响正式栈。
 
 环境文件应仅允许部署账号读取。建议使用密码管理器生成值。不要把真实值放进仓库内的 `.env`、命令示例、截图、Issue 或聊天记录。仓库的 Docker 构建上下文是项目根目录，把“已被 Git 忽略”的秘密文件留在仓库内仍可能把它发送给 Docker daemon，因此真实环境文件必须放在仓库外。
 

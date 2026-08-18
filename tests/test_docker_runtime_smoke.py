@@ -1,4 +1,5 @@
 import json
+import os
 import shutil
 import subprocess
 import time
@@ -7,6 +8,27 @@ import urllib.request
 from pathlib import Path
 
 import pytest
+
+
+_CLOUDFLARE_COMPOSE_FILE = "docker-compose.cloudflare.yml"
+_CLOUDFLARE_SMOKE_PROJECT = "cultivation-world-cloudflare-smoke"
+_CLOUDFLARE_SMOKE_PORT = 18123
+
+
+def get_cloudflare_smoke_environment(data_dir: Path) -> dict[str, str]:
+    environment = os.environ.copy()
+    environment.update(
+        {
+            "CWS_ADMIN_PASSWORD": "docker-smoke-admin-password",
+            "CWS_ADMIN_SESSION_SECRET": (
+                "docker-smoke-session-secret-with-at-least-32-characters"
+            ),
+            "CLOUDFLARE_TUNNEL_TOKEN": "not-used-by-this-smoke-test",
+            "CWS_FRONTEND_PORT": str(_CLOUDFLARE_SMOKE_PORT),
+            "CWS_DOCKER_DATA_DIR": str(data_dir),
+        }
+    )
+    return environment
 
 
 def format_process_error(exc: subprocess.CalledProcessError) -> str:
@@ -33,6 +55,30 @@ def run_compose(*args: str, timeout: int = 300) -> subprocess.CompletedProcess[s
     )
 
 
+def run_cloudflare_compose(
+    *args: str,
+    environment: dict[str, str],
+    timeout: int = 300,
+) -> subprocess.CompletedProcess[str]:
+    return subprocess.run(
+        [
+            "docker",
+            "compose",
+            "-p",
+            _CLOUDFLARE_SMOKE_PROJECT,
+            "-f",
+            _CLOUDFLARE_COMPOSE_FILE,
+            *args,
+        ],
+        cwd=get_project_root(),
+        env=environment,
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=timeout,
+    )
+
+
 def http_json(url: str, method: str = "GET", payload: dict | None = None) -> dict:
     data = None
     headers = {}
@@ -42,6 +88,18 @@ def http_json(url: str, method: str = "GET", payload: dict | None = None) -> dic
     request = urllib.request.Request(url=url, method=method, data=data, headers=headers)
     with urllib.request.urlopen(request, timeout=10) as response:
         return json.loads(response.read().decode("utf-8"))
+
+
+def http_error_json(
+    url: str,
+    method: str,
+    payload: dict | None = None,
+) -> tuple[int, dict]:
+    try:
+        http_json(url, method=method, payload=payload)
+    except urllib.error.HTTPError as exc:
+        return exc.code, json.loads(exc.read().decode("utf-8"))
+    raise AssertionError(f"Expected {method} {url} to return an HTTP error")
 
 
 def wait_until_backend_ready(timeout_seconds: int = 120) -> None:
@@ -71,13 +129,18 @@ def wait_until_backend_ready(timeout_seconds: int = 120) -> None:
     )
 
 
-def wait_until_frontend_proxy_ready(timeout_seconds: int = 120) -> None:
+def wait_until_frontend_proxy_ready(
+    timeout_seconds: int = 120,
+    port: int = 8123,
+) -> None:
     deadline = time.time() + timeout_seconds
     last_error: Exception | None = None
     last_payload: dict | None = None
     while time.time() < deadline:
         try:
-            payload = http_json("http://localhost:8123/api/v1/query/runtime/status")
+            payload = http_json(
+                f"http://localhost:{port}/api/v1/query/runtime/status"
+            )
             last_payload = payload
             if isinstance(payload, dict):
                 if payload.get("ok") is True and isinstance(payload.get("data"), dict):
@@ -93,13 +156,43 @@ def wait_until_frontend_proxy_ready(timeout_seconds: int = 120) -> None:
             last_error = exc
         time.sleep(2)
     raise AssertionError(
-        "Frontend proxy /api/v1/query/runtime/status did not become ready in time. "
+        f"Frontend proxy on port {port} did not become ready in time. "
         f"Last payload: {last_payload!r}; last error: {last_error!r}"
     )
 
 
 def get_compose_service_health(service_name: str) -> str | None:
     service = run_compose("ps", "-q", service_name, timeout=60).stdout.strip()
+    if not service:
+        return None
+
+    result = subprocess.run(
+        [
+            "docker",
+            "inspect",
+            "--format",
+            "{{if .State.Health}}{{.State.Health.Status}}{{else}}missing{{end}}",
+            service,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    return result.stdout.strip()
+
+
+def get_cloudflare_compose_service_health(
+    service_name: str,
+    environment: dict[str, str],
+) -> str | None:
+    service = run_cloudflare_compose(
+        "ps",
+        "-q",
+        service_name,
+        environment=environment,
+        timeout=60,
+    ).stdout.strip()
     if not service:
         return None
 
@@ -132,6 +225,24 @@ def wait_until_compose_service_healthy(
         time.sleep(2)
     raise AssertionError(
         f"Compose service {service_name!r} did not become healthy in time. "
+        f"Last health status: {last_health!r}"
+    )
+
+
+def wait_until_cloudflare_compose_service_healthy(
+    service_name: str,
+    environment: dict[str, str],
+    timeout_seconds: int = 120,
+) -> None:
+    deadline = time.time() + timeout_seconds
+    last_health: str | None = None
+    while time.time() < deadline:
+        last_health = get_cloudflare_compose_service_health(service_name, environment)
+        if last_health == "healthy":
+            return
+        time.sleep(2)
+    raise AssertionError(
+        f"Cloudflare Compose service {service_name!r} did not become healthy in time. "
         f"Last health status: {last_health!r}"
     )
 
@@ -175,6 +286,79 @@ def test_docker_compose_services_become_healthy():
         subprocess.run(
             ["docker", "compose", "down"],
             cwd=get_project_root(),
+            capture_output=True,
+            text=True,
+            timeout=180,
+            check=False,
+        )
+
+
+@pytest.mark.docker
+@pytest.mark.skipif(shutil.which("docker") is None, reason="docker not found in PATH")
+def test_cloudflare_compose_proxy_auth_and_data_root_smoke(tmp_path: Path):
+    environment = get_cloudflare_smoke_environment(tmp_path / "docker-data")
+    try:
+        run_cloudflare_compose(
+            "up",
+            "-d",
+            "--build",
+            "backend",
+            "frontend",
+            environment=environment,
+            timeout=900,
+        )
+        wait_until_frontend_proxy_ready(port=_CLOUDFLARE_SMOKE_PORT)
+        wait_until_cloudflare_compose_service_healthy("backend", environment)
+        wait_until_cloudflare_compose_service_healthy("frontend", environment)
+
+        session = http_json(
+            f"http://localhost:{_CLOUDFLARE_SMOKE_PORT}/api/v1/query/auth/session"
+        )
+        assert session == {
+            "ok": True,
+            "data": {
+                "enabled": True,
+                "authenticated": False,
+                "csrf_token": None,
+            },
+        }
+
+        command_status, command_error = http_error_json(
+            f"http://localhost:{_CLOUDFLARE_SMOKE_PORT}/api/v1/command/game/pause",
+            method="POST",
+            payload={},
+        )
+        assert command_status == 401
+        assert command_error["ok"] is False
+        assert command_error["error"]["code"] == "ADMIN_AUTH_REQUIRED"
+
+        data_root = run_cloudflare_compose(
+            "exec",
+            "-T",
+            "backend",
+            "python",
+            "-c",
+            (
+                "from src.config.data_paths import get_data_paths; "
+                "print(get_data_paths().root)"
+            ),
+            environment=environment,
+            timeout=60,
+        ).stdout.strip()
+        assert data_root == "/data"
+    finally:
+        subprocess.run(
+            [
+                "docker",
+                "compose",
+                "-p",
+                _CLOUDFLARE_SMOKE_PROJECT,
+                "-f",
+                _CLOUDFLARE_COMPOSE_FILE,
+                "down",
+            ],
+            cwd=get_project_root(),
+            env=environment,
             capture_output=True,
             text=True,
             timeout=180,

@@ -1,6 +1,8 @@
 import importlib
 from pathlib import Path
 
+import yaml
+
 import src.config.data_paths as data_paths
 import src.utils.config as app_config
 
@@ -49,3 +51,16 @@ def test_default_llm_logger_uses_data_root_logs(monkeypatch, tmp_path: Path):
     logger = run_log.Logger()
 
     assert logger.log_dir == explicit_root / "logs"
+
+
+def test_cloudflare_compose_uses_the_runtime_data_root_contract():
+    project_root = Path(__file__).resolve().parents[1]
+    compose = yaml.safe_load(
+        (project_root / "docker-compose.cloudflare.yml").read_text(encoding="utf-8")
+    )
+    backend = compose["services"]["backend"]
+
+    assert backend["environment"]["CWS_DATA_DIR"] == "/data"
+    assert "${CWS_DOCKER_DATA_DIR:-./docker-data}:/data" in backend["volumes"]
+    assert "./assets/saves:/app/assets/saves" not in backend["volumes"]
+    assert "./logs:/app/logs" not in backend["volumes"]

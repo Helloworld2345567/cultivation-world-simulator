@@ -19,13 +19,17 @@ Deploy the simulator at `https://world.ym0v0.com` through Cloudflare while keepi
 
 The following require an authenticated administrator when authentication is enabled:
 
-- every `/api/v1/command/*` endpoint;
+- every `/api/v1/command/*` endpoint except the anonymous
+  `/api/v1/command/auth/login` bootstrap command;
 - settings mutations and LLM configuration access;
 - save-file listing;
 - server shutdown;
 - any future non-read-only endpoint added beneath those namespaces.
 
-The regular `/api/v1/query/*` world-observation endpoints remain public unless they expose administrator-only data.
+The login command is the only anonymous command and does not mutate the world.
+The regular `/api/v1/query/*` world-observation endpoints remain public unless
+they expose administrator-only data; `/api/v1/query/auth/session` is also public
+so the browser can discover its current access mode.
 
 ## Frontend behavior
 

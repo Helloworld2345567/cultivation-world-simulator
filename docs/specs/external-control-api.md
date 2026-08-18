@@ -248,6 +248,14 @@
 - 内部仍可用 HTTP 状态码区分错误类别，但响应体结构应稳定。
 - `error.code` 必须是稳定字符串，方便 skill 做程序判断。
 
+管理员鉴权接口同样遵守该契约，并纳入 v1 query / command 分层：
+
+- `GET /api/v1/query/auth/session`：公开查询当前浏览器的管理员会话状态。
+- `POST /api/v1/command/auth/login`：公开的登录入口；这是 command 鉴权守卫的唯一显式豁免。
+- `POST /api/v1/command/auth/logout`：需要有效会话与 CSRF token。
+- 成功统一返回 `ok/data`；认证、CSRF、限流及请求校验失败统一返回 `ok/error`，其中 `error.code` 稳定可供前端与外部 agent 分支处理。
+- 登录校验错误不得在 `error.details` 中回显密码或原始请求体。
+
 ## 4. 并发与健壮性基础
 
 ### 4.1 Mutation 串行化
@@ -322,6 +330,7 @@ query 不应直接暴露“半更新中”的临时状态。
 16. `GET /api/v1/query/dynasty/overview`
 17. `GET /api/v1/query/dynasty/detail`
 18. `GET /api/v1/query/saves`
+19. `GET /api/v1/query/auth/session`
 
 ### 5.2 Command API
 
@@ -346,6 +355,8 @@ query 不应直接暴露“半更新中”的临时状态。
 17. `POST /api/v1/command/avatar/update-portrait`
 18. `POST /api/v1/command/avatar/generate-custom-content`
 19. `POST /api/v1/command/avatar/create-custom-content`
+20. `POST /api/v1/command/auth/login`
+21. `POST /api/v1/command/auth/logout`
 
 ### 5.3 暂缓到第二批
 
@@ -357,7 +368,6 @@ query 不应直接暴露“半更新中”的临时状态。
 4. 触发特定世界事件
 5. 直接写世界数值
 6. 多会话 / 多实例
-7. 鉴权与权限分级
 
 ## 6. 推荐目录结构
 
@@ -566,6 +576,7 @@ src/server/
 
 - `web/src` 前端运行时代码：
   - 业务接口已基本切到 `/api/v1/*`
+  - 管理员会话使用 `/api/v1/query/auth/session` 与 `/api/v1/command/auth/*`
   - 例外是设置真源 `/api/settings*` 与 `/api/settings/llm*`，这些属于应用设置面，不属于外接控制兼容层
 - `tests/*`：
   - 外接控制相关测试已全部迁到 `/api/v1/*`

@@ -43,6 +43,7 @@ const messages = Object.fromEntries(
 const schemaMessages = isEnabledLocale(schemaLocale)
   ? loadLocaleMessages(schemaLocale)
   : {}
+const fallbackLocales = [...new Set([fallbackLocale, defaultLocale])]
 
 type MessageSchema = typeof schemaMessages
 type LocaleMessages = Record<AppLocale, MessageSchema>
@@ -50,7 +51,7 @@ type LocaleMessages = Record<AppLocale, MessageSchema>
 const i18n = createI18n<[MessageSchema], string>({
   legacy: false,
   locale: defaultLocale,
-  fallbackLocale,
+  fallbackLocale: fallbackLocales,
   messages: messages as LocaleMessages,
 })
 

@@ -3,14 +3,14 @@ import type { AuthSessionDTO } from '../../types/api';
 
 export const authApi = {
   fetchSession() {
-    return httpClient.get<AuthSessionDTO>('/api/auth/session');
+    return httpClient.get<AuthSessionDTO>('/api/v1/query/auth/session');
   },
 
   login(password: string) {
-    return httpClient.post<AuthSessionDTO>('/api/auth/login', { password });
+    return httpClient.post<AuthSessionDTO>('/api/v1/command/auth/login', { password });
   },
 
   logout() {
-    return httpClient.post<AuthSessionDTO>('/api/auth/logout', {});
+    return httpClient.post<AuthSessionDTO>('/api/v1/command/auth/logout', {});
   },
 };

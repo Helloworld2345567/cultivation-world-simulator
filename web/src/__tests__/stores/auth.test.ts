@@ -8,7 +8,7 @@ function jsonResponse(data: unknown): Response {
     ok: true,
     status: 200,
     statusText: 'OK',
-    json: vi.fn().mockResolvedValue(data),
+    json: vi.fn().mockResolvedValue({ ok: true, data }),
   } as unknown as Response
 }
 
@@ -18,7 +18,8 @@ function errorResponse(status: number, code: string): Response {
     status,
     statusText: status === 401 ? 'Unauthorized' : 'Forbidden',
     json: vi.fn().mockResolvedValue({
-      detail: {
+      ok: false,
+      error: {
         code,
         message: 'Administrator authentication required',
         details: {},
@@ -51,7 +52,7 @@ describe('auth store', () => {
     expect(store.canWrite).toBe(false)
     expect(store.isReadOnly).toBe(true)
     expect(global.fetch).toHaveBeenCalledWith(
-      expect.stringContaining('/api/auth/session'),
+      expect.stringContaining('/api/v1/query/auth/session'),
       expect.objectContaining({ method: 'GET' }),
     )
   })
@@ -103,7 +104,7 @@ describe('auth store', () => {
     expect(store.canWrite).toBe(true)
     expect(store.csrfToken).toBe('csrf-after-login')
     expect(global.fetch).toHaveBeenLastCalledWith(
-      expect.stringContaining('/api/auth/login'),
+      expect.stringContaining('/api/v1/command/auth/login'),
       expect.objectContaining({
         method: 'POST',
         body: JSON.stringify({ password: 'correct horse battery staple' }),
@@ -157,7 +158,7 @@ describe('auth store', () => {
     expect(store.canWrite).toBe(false)
     expect(store.csrfToken).toBeNull()
     expect(global.fetch).toHaveBeenLastCalledWith(
-      expect.stringContaining('/api/auth/logout'),
+      expect.stringContaining('/api/v1/command/auth/logout'),
       expect.objectContaining({
         method: 'POST',
         headers: expect.objectContaining({

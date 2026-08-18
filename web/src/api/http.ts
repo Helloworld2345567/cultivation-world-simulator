@@ -20,7 +20,15 @@ export function setAdminAuthRequiredHandler(handler: (() => void) | null): void 
 }
 
 function getApiErrorCode(errorData: unknown): string | null {
-  if (!errorData || typeof errorData !== 'object' || !('detail' in errorData)) return null;
+  if (!errorData || typeof errorData !== 'object') return null;
+  if ('error' in errorData) {
+    const error = (errorData as { error?: unknown }).error;
+    if (error && typeof error === 'object' && 'code' in error) {
+      const code = (error as { code?: unknown }).code;
+      if (typeof code === 'string') return code;
+    }
+  }
+  if (!('detail' in errorData)) return null;
   const detail = (errorData as { detail?: unknown }).detail;
   if (!detail || typeof detail !== 'object' || !('code' in detail)) return null;
   const code = (detail as { code?: unknown }).code;
@@ -117,8 +125,18 @@ async function request<T>(
     
     try {
       errorData = await response.json();
-      // 如果后端返回了 detail 字段，使用它作为错误消息
-      if (errorData && typeof errorData === 'object' && 'detail' in errorData) {
+      if (errorData && typeof errorData === 'object' && 'error' in errorData) {
+        const publicError = (errorData as { error?: unknown }).error;
+        if (
+          publicError &&
+          typeof publicError === 'object' &&
+          'message' in publicError &&
+          typeof (publicError as { message?: unknown }).message === 'string'
+        ) {
+          errorMessage = (publicError as { message: string }).message;
+        }
+      } else if (errorData && typeof errorData === 'object' && 'detail' in errorData) {
+        // Keep compatibility with settings and older FastAPI errors.
         const detail = (errorData as { detail?: unknown }).detail;
         if (typeof detail === 'string') {
           errorMessage = detail;

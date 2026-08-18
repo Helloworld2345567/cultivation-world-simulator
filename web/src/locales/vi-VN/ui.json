@@ -48,21 +48,6 @@
   "about_contributors_desc": "Cảm ơn tất cả những người sáng tạo đã đóng góp cho dự án mã nguồn mở này!",
   "auto_save": "Tự Động Lưu",
   "auto_save_desc": "Tự động lưu trò chơi vào tháng Giêng của mỗi thập kỷ",
-  "admin_auth": {
-    "visitor_status": "Khách · Chỉ xem",
-    "admin_status": "Quản trị viên · Có thể chỉnh sửa",
-    "local_status": "Chế độ quản trị cục bộ",
-    "password_label": "Mật khẩu quản trị viên",
-    "password_placeholder": "Nhập mật khẩu quản trị viên",
-    "login": "Đăng nhập",
-    "logging_in": "Đang đăng nhập…",
-    "logout": "Thoát chế độ quản trị",
-    "logging_out": "Đang đăng xuất…",
-    "admin_hint": "Bạn hiện có thể chỉnh sửa và điều khiển thế giới này.",
-    "read_only_hint": "Khách chỉ có thể quan sát thế giới. Hãy đăng nhập quản trị viên để thực hiện thao tác này.",
-    "login_failed": "Đăng nhập thất bại. Hãy kiểm tra mật khẩu quản trị viên.",
-    "logout_failed": "Đăng xuất thất bại. Vui lòng thử lại sau."
-  },
   "create_avatar": {
     "fetch_failed": "Lấy dữ liệu trò chơi thất bại",
     "create_success": "Tạo nhân vật thành công",

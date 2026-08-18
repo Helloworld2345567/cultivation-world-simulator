@@ -11,6 +11,9 @@ from src.server.host_app import create_app
 
 _ADMIN_PASSWORD = "correct horse battery staple"
 _SESSION_SECRET = "test-session-signing-secret-with-32-bytes"
+_AUTH_SESSION_PATH = "/api/v1/query/auth/session"
+_AUTH_LOGIN_PATH = "/api/v1/command/auth/login"
+_AUTH_LOGOUT_PATH = "/api/v1/command/auth/logout"
 
 
 @asynccontextmanager
@@ -24,19 +27,30 @@ def _enable_admin_auth(monkeypatch) -> None:
     monkeypatch.setenv("CWS_ADMIN_COOKIE_SECURE", "1")
 
 
+def _assert_public_error(response, code: str) -> None:
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == code
+    assert isinstance(payload["error"]["message"], str)
+    assert payload["error"]["details"] == {}
+
+
 def test_auth_session_reports_disabled_when_admin_password_is_not_configured(monkeypatch):
     monkeypatch.delenv("CWS_ADMIN_PASSWORD", raising=False)
     monkeypatch.delenv("CWS_ADMIN_SESSION_SECRET", raising=False)
 
     client = TestClient(create_app(lifespan=_lifespan))
 
-    response = client.get("/api/auth/session")
+    response = client.get(_AUTH_SESSION_PATH)
 
     assert response.status_code == 200
     assert response.json() == {
-        "enabled": False,
-        "authenticated": False,
-        "csrf_token": None,
+        "ok": True,
+        "data": {
+            "enabled": False,
+            "authenticated": False,
+            "csrf_token": None,
+        },
     }
 
 
@@ -53,7 +67,7 @@ def test_visitor_cannot_call_command_when_admin_auth_is_enabled(monkeypatch):
     response = client.post("/api/v1/command/example")
 
     assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "ADMIN_AUTH_REQUIRED"
+    _assert_public_error(response, "ADMIN_AUTH_REQUIRED")
 
 
 def test_command_cors_preflight_does_not_require_admin_session(monkeypatch):
@@ -90,7 +104,7 @@ def test_visitor_cannot_list_saves_when_admin_auth_is_enabled(monkeypatch):
     response = client.get("/api/v1/query/saves")
 
     assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "ADMIN_AUTH_REQUIRED"
+    _assert_public_error(response, "ADMIN_AUTH_REQUIRED")
 
 
 @pytest.mark.parametrize(
@@ -125,7 +139,7 @@ def test_visitor_cannot_change_settings_when_admin_auth_is_enabled(monkeypatch):
     response = client.patch("/api/settings", json={"ui": {"locale": "en-US"}})
 
     assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "ADMIN_AUTH_REQUIRED"
+    _assert_public_error(response, "ADMIN_AUTH_REQUIRED")
 
 
 def test_visitor_cannot_reset_settings_when_admin_auth_is_enabled(monkeypatch):
@@ -141,7 +155,7 @@ def test_visitor_cannot_reset_settings_when_admin_auth_is_enabled(monkeypatch):
     response = client.post("/api/settings/reset")
 
     assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "ADMIN_AUTH_REQUIRED"
+    _assert_public_error(response, "ADMIN_AUTH_REQUIRED")
 
 
 @pytest.mark.parametrize(
@@ -160,7 +174,7 @@ def test_visitor_cannot_read_llm_configuration_when_admin_auth_is_enabled(monkey
     response = client.get(path)
 
     assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "ADMIN_AUTH_REQUIRED"
+    _assert_public_error(response, "ADMIN_AUTH_REQUIRED")
 
 
 @pytest.mark.parametrize("session_secret", [None, "too-short"])
@@ -191,6 +205,34 @@ def test_admin_auth_fails_closed_when_only_session_secret_is_configured(monkeypa
         create_app(lifespan=_lifespan)
 
 
+@pytest.mark.parametrize(
+    ("password", "session_secret", "expected_variable"),
+    [
+        (
+            "replace-with-a-long-random-password",
+            _SESSION_SECRET,
+            "CWS_ADMIN_PASSWORD",
+        ),
+        (
+            _ADMIN_PASSWORD,
+            "replace-with-at-least-32-random-characters",
+            "CWS_ADMIN_SESSION_SECRET",
+        ),
+    ],
+)
+def test_admin_auth_rejects_documented_placeholder_secrets(
+    monkeypatch,
+    password,
+    session_secret,
+    expected_variable,
+):
+    monkeypatch.setenv("CWS_ADMIN_PASSWORD", password)
+    monkeypatch.setenv("CWS_ADMIN_SESSION_SECRET", session_secret)
+
+    with pytest.raises(RuntimeError, match=expected_variable):
+        create_app(lifespan=_lifespan)
+
+
 def test_wrong_admin_password_does_not_create_session(monkeypatch):
     _enable_admin_auth(monkeypatch)
     client = TestClient(
@@ -198,12 +240,48 @@ def test_wrong_admin_password_does_not_create_session(monkeypatch):
         base_url="https://testserver",
     )
 
-    response = client.post("/api/auth/login", json={"password": "definitely-wrong"})
+    response = client.post(_AUTH_LOGIN_PATH, json={"password": "definitely-wrong"})
 
     assert response.status_code == 401
-    assert response.json()["detail"]["code"] == "ADMIN_LOGIN_INVALID"
+    _assert_public_error(response, "ADMIN_LOGIN_INVALID")
     assert "set-cookie" not in response.headers
-    assert client.get("/api/auth/session").json()["authenticated"] is False
+    assert client.get(_AUTH_SESSION_PATH).json()["data"]["authenticated"] is False
+
+
+@pytest.mark.parametrize(
+    ("body", "content_type"),
+    [
+        (b"{}", "application/json"),
+        (b"{", "application/json"),
+    ],
+)
+def test_invalid_admin_login_request_uses_public_error_contract(
+    monkeypatch,
+    body,
+    content_type,
+):
+    _enable_admin_auth(monkeypatch)
+    client = TestClient(
+        create_app(lifespan=_lifespan),
+        base_url="https://testserver",
+    )
+
+    response = client.post(
+        _AUTH_LOGIN_PATH,
+        content=body,
+        headers={"Content-Type": content_type},
+    )
+
+    assert response.status_code == 422
+    payload = response.json()
+    assert payload["ok"] is False
+    assert payload["error"]["code"] == "ADMIN_LOGIN_REQUEST_INVALID"
+    assert payload["error"]["message"] == "Administrator login request is invalid"
+    assert isinstance(payload["error"]["details"]["errors"], list)
+    assert all(
+        "input" not in error and "ctx" not in error
+        for error in payload["error"]["details"]["errors"]
+    )
 
 
 def test_correct_admin_password_creates_secure_http_only_session(monkeypatch):
@@ -213,10 +291,12 @@ def test_correct_admin_password_creates_secure_http_only_session(monkeypatch):
         base_url="https://testserver",
     )
 
-    response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
+    response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
 
     assert response.status_code == 200
-    payload = response.json()
+    response_payload = response.json()
+    assert response_payload["ok"] is True
+    payload = response_payload["data"]
     assert payload["enabled"] is True
     assert payload["authenticated"] is True
     assert isinstance(payload["csrf_token"], str)
@@ -230,9 +310,9 @@ def test_correct_admin_password_creates_secure_http_only_session(monkeypatch):
     assert "max-age=" in cookie
     assert response.headers["cache-control"] == "no-store"
 
-    session_response = client.get("/api/auth/session")
+    session_response = client.get(_AUTH_SESSION_PATH)
     assert session_response.status_code == 200
-    assert session_response.json() == payload
+    assert session_response.json() == {"ok": True, "data": payload}
     assert session_response.headers["cache-control"] == "no-store"
 
 
@@ -240,7 +320,7 @@ def test_tampered_session_cookie_is_rejected(monkeypatch):
     _enable_admin_auth(monkeypatch)
     app = create_app(lifespan=_lifespan)
     client = TestClient(app, base_url="https://testserver")
-    client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
+    client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
     cookie = client.cookies.get("cws_admin_session")
     assert cookie
     replacement = "A" if cookie[-1] != "A" else "B"
@@ -248,12 +328,12 @@ def test_tampered_session_cookie_is_rejected(monkeypatch):
     client.cookies.clear()
 
     response = client.get(
-        "/api/auth/session",
+        _AUTH_SESSION_PATH,
         headers={"Cookie": f"cws_admin_session={tampered_cookie}"},
     )
 
     assert response.status_code == 200
-    assert response.json()["authenticated"] is False
+    assert response.json()["data"]["authenticated"] is False
 
 
 def test_cookie_secure_flag_can_be_disabled_for_local_http_testing(monkeypatch):
@@ -261,13 +341,13 @@ def test_cookie_secure_flag_can_be_disabled_for_local_http_testing(monkeypatch):
     monkeypatch.setenv("CWS_ADMIN_COOKIE_SECURE", "0")
     client = TestClient(create_app(lifespan=_lifespan))
 
-    response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
+    response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
 
     cookie = response.headers["set-cookie"].lower()
     assert "; secure" not in cookie
     assert "httponly" in cookie
     assert "samesite=strict" in cookie
-    assert client.get("/api/auth/session").json()["authenticated"] is True
+    assert client.get(_AUTH_SESSION_PATH).json()["data"]["authenticated"] is True
 
 
 def test_authenticated_admin_can_read_save_list_without_csrf(monkeypatch):
@@ -279,7 +359,7 @@ def test_authenticated_admin_can_read_save_list_without_csrf(monkeypatch):
         return {"ok": True, "data": {"saves": ["admin-save.json"]}}
 
     client = TestClient(app, base_url="https://testserver")
-    login_response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
+    login_response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
     assert login_response.status_code == 200
 
     response = client.get("/api/v1/query/saves")
@@ -299,13 +379,13 @@ def test_authenticated_write_without_csrf_is_rejected_before_handler(monkeypatch
         return {"ok": True}
 
     client = TestClient(app, base_url="https://testserver")
-    login_response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
+    login_response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
     assert login_response.status_code == 200
 
     response = client.post("/api/v1/command/example")
 
     assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "ADMIN_CSRF_INVALID"
+    _assert_public_error(response, "ADMIN_CSRF_INVALID")
     assert calls == []
 
 
@@ -320,7 +400,7 @@ def test_authenticated_write_with_wrong_csrf_is_rejected_before_handler(monkeypa
         return {"ok": True}
 
     client = TestClient(app, base_url="https://testserver")
-    login_response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
+    login_response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
     assert login_response.status_code == 200
 
     response = client.post(
@@ -329,7 +409,7 @@ def test_authenticated_write_with_wrong_csrf_is_rejected_before_handler(monkeypa
     )
 
     assert response.status_code == 403
-    assert response.json()["detail"]["code"] == "ADMIN_CSRF_INVALID"
+    _assert_public_error(response, "ADMIN_CSRF_INVALID")
     assert calls == []
 
 
@@ -344,8 +424,8 @@ def test_authenticated_write_with_csrf_reaches_existing_handler(monkeypatch):
         return {"ok": True}
 
     client = TestClient(app, base_url="https://testserver")
-    login_response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
-    csrf_token = login_response.json()["csrf_token"]
+    login_response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
+    csrf_token = login_response.json()["data"]["csrf_token"]
 
     response = client.post(
         "/api/v1/command/example",
@@ -361,32 +441,35 @@ def test_logout_invalidates_server_session_and_clears_cookie(monkeypatch):
     _enable_admin_auth(monkeypatch)
     app = create_app(lifespan=_lifespan)
     client = TestClient(app, base_url="https://testserver")
-    login_response = client.post("/api/auth/login", json={"password": _ADMIN_PASSWORD})
-    csrf_token = login_response.json()["csrf_token"]
+    login_response = client.post(_AUTH_LOGIN_PATH, json={"password": _ADMIN_PASSWORD})
+    csrf_token = login_response.json()["data"]["csrf_token"]
     issued_cookie = client.cookies.get("cws_admin_session")
     assert issued_cookie
 
     response = client.post(
-        "/api/auth/logout",
+        _AUTH_LOGOUT_PATH,
         json={},
         headers={"X-CSRF-Token": csrf_token},
     )
 
     assert response.status_code == 200
     assert response.json() == {
-        "enabled": True,
-        "authenticated": False,
-        "csrf_token": None,
+        "ok": True,
+        "data": {
+            "enabled": True,
+            "authenticated": False,
+            "csrf_token": None,
+        },
     }
     assert "max-age=0" in response.headers["set-cookie"].lower()
-    assert client.get("/api/auth/session").json()["authenticated"] is False
+    assert client.get(_AUTH_SESSION_PATH).json()["data"]["authenticated"] is False
 
     replay_client = TestClient(app, base_url="https://testserver")
     replay_response = replay_client.get(
-        "/api/auth/session",
+        _AUTH_SESSION_PATH,
         headers={"Cookie": f"cws_admin_session={issued_cookie}"},
     )
-    assert replay_response.json()["authenticated"] is False
+    assert replay_response.json()["data"]["authenticated"] is False
 
 
 def test_server_session_registry_evicts_oldest_session_at_limit(monkeypatch):
@@ -394,7 +477,7 @@ def test_server_session_registry_evicts_oldest_session_at_limit(monkeypatch):
     app = create_app(lifespan=_lifespan)
     client = TestClient(app, base_url="https://testserver")
     first_login = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": _ADMIN_PASSWORD},
     )
     first_cookie = client.cookies.get("cws_admin_session")
@@ -403,18 +486,18 @@ def test_server_session_registry_evicts_oldest_session_at_limit(monkeypatch):
 
     for _ in range(64):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": _ADMIN_PASSWORD},
         )
         assert response.status_code == 200
 
     replay_client = TestClient(app, base_url="https://testserver")
     replay_response = replay_client.get(
-        "/api/auth/session",
+        _AUTH_SESSION_PATH,
         headers={"Cookie": f"cws_admin_session={first_cookie}"},
     )
 
-    assert replay_response.json()["authenticated"] is False
+    assert replay_response.json()["data"]["authenticated"] is False
 
 
 def test_repeated_failed_logins_are_rate_limited(monkeypatch):
@@ -425,16 +508,16 @@ def test_repeated_failed_logins_are_rate_limited(monkeypatch):
     )
 
     for _ in range(5):
-        response = client.post("/api/auth/login", json={"password": "wrong-password"})
+        response = client.post(_AUTH_LOGIN_PATH, json={"password": "wrong-password"})
         assert response.status_code == 401
 
     blocked_response = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": "still-wrong"},
     )
 
     assert blocked_response.status_code == 429
-    assert blocked_response.json()["detail"]["code"] == "ADMIN_LOGIN_RATE_LIMITED"
+    _assert_public_error(blocked_response, "ADMIN_LOGIN_RATE_LIMITED")
     assert int(blocked_response.headers["retry-after"]) > 0
     assert "set-cookie" not in blocked_response.headers
 
@@ -467,7 +550,7 @@ def test_parallel_failed_logins_cannot_overrun_limit(monkeypatch):
         client = TestClient(app, base_url="https://testserver")
         start_barrier.wait(timeout=5)
         return client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
         ).status_code
 
@@ -497,14 +580,14 @@ def test_cloudflare_client_ip_header_is_not_trusted_by_default(monkeypatch):
 
     for index in range(5):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
             headers={"CF-Connecting-IP": f"203.0.113.{index + 1}"},
         )
         assert response.status_code == 401
 
     blocked_response = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": "wrong-password"},
         headers={"CF-Connecting-IP": "203.0.113.250"},
     )
@@ -522,14 +605,14 @@ def test_cloudflare_client_ip_can_be_trusted_explicitly(monkeypatch):
 
     for _ in range(5):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
             headers={"CF-Connecting-IP": "203.0.113.10"},
         )
         assert response.status_code == 401
 
     other_source_response = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": "wrong-password"},
         headers={"CF-Connecting-IP": "203.0.113.11"},
     )
@@ -547,14 +630,14 @@ def test_invalid_cloudflare_client_ip_falls_back_to_peer(monkeypatch):
 
     for index in range(5):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
             headers={"CF-Connecting-IP": f"not-an-ip-{index}"},
         )
         assert response.status_code == 401
 
     blocked_response = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": "wrong-password"},
         headers={"CF-Connecting-IP": "still-not-an-ip"},
     )
@@ -580,14 +663,14 @@ def test_login_failure_sources_share_a_bounded_overflow_bucket(monkeypatch):
 
     for source_suffix in range(1, 8):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
             headers={"CF-Connecting-IP": f"203.0.113.{source_suffix}"},
         )
         assert response.status_code == 401
 
     blocked_response = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": "wrong-password"},
         headers={"CF-Connecting-IP": "203.0.113.8"},
     )
@@ -614,7 +697,7 @@ def test_expired_login_failure_sources_are_removed_globally(monkeypatch):
 
     for source_suffix in (1, 2):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
             headers={"CF-Connecting-IP": f"203.0.113.{source_suffix}"},
         )
@@ -623,14 +706,14 @@ def test_expired_login_failure_sources_are_removed_globally(monkeypatch):
     monotonic_time[0] = 301.0
     for _ in range(5):
         response = client.post(
-            "/api/auth/login",
+            _AUTH_LOGIN_PATH,
             json={"password": "wrong-password"},
             headers={"CF-Connecting-IP": "203.0.113.3"},
         )
         assert response.status_code == 401
 
     fresh_source_response = client.post(
-        "/api/auth/login",
+        _AUTH_LOGIN_PATH,
         json={"password": "wrong-password"},
         headers={"CF-Connecting-IP": "203.0.113.4"},
     )

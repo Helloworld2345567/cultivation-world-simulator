@@ -168,6 +168,8 @@ docker-compose up -d --build
 - 只读查询：`/api/v1/query/*`
 - 受控写入：`/api/v1/command/*`
 
+公网管理员鉴权也使用同一 v1 契约：`GET /api/v1/query/auth/session` 查询会话，`POST /api/v1/command/auth/login` 登录，`POST /api/v1/command/auth/logout` 退出。成功返回 `ok/data`，认证、CSRF、限流或请求校验失败返回稳定的 `ok/error` 与 `error.code`。
+
 常见起点接口：
 
 - `GET /api/v1/query/runtime/status`

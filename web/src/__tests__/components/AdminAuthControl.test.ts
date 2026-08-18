@@ -10,7 +10,7 @@ function jsonResponse(data: unknown): Response {
     ok: true,
     status: 200,
     statusText: 'OK',
-    json: vi.fn().mockResolvedValue(data),
+    json: vi.fn().mockResolvedValue({ ok: true, data }),
   } as unknown as Response
 }
 
@@ -20,6 +20,7 @@ describe('AdminAuthControl', () => {
   })
 
   afterEach(() => {
+    i18n.global.locale.value = 'zh-CN'
     vi.useFakeTimers()
   })
 
@@ -59,5 +60,17 @@ describe('AdminAuthControl', () => {
     expect(wrapper.text()).toContain('本地管理模式')
     expect(wrapper.find('input[type="password"]').exists()).toBe(false)
     expect(wrapper.get('.admin-auth-control__trigger').attributes('disabled')).toBeDefined()
+  })
+
+  it('falls back to Phase 1 zh-CN messages when the active locale lacks auth keys', () => {
+    i18n.global.locale.value = 'en-US'
+    useAuthStore().$patch({ enabled: true, authenticated: false, hydrated: true })
+
+    const wrapper = mount(AdminAuthControl, {
+      global: { plugins: [i18n] },
+    })
+
+    expect(wrapper.text()).toContain('游客·只读')
+    expect(wrapper.text()).not.toContain('ui.admin_auth.visitor_status')
   })
 })

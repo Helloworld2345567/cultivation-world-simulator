@@ -13,8 +13,12 @@ from secrets import token_urlsafe
 from threading import Lock
 
 from fastapi import APIRouter, FastAPI, Request
+from fastapi.exception_handlers import request_validation_exception_handler
+from fastapi.exceptions import RequestValidationError
 from pydantic import BaseModel, Field
 from starlette.responses import JSONResponse
+
+from src.server.services.public_api_contract import ok_response
 
 
 _SESSION_COOKIE_NAME = "cws_admin_session"
@@ -25,12 +29,21 @@ _LOGIN_FAILURE_WINDOW_SECONDS = 5 * 60
 _LOGIN_FAILURE_SOURCE_LIMIT = 256
 _LOGIN_FAILURE_OVERFLOW_KEY = "overflow"
 _FALSE_ENV_VALUES = {"0", "false", "no", "off"}
+_PLACEHOLDER_SECRET_PREFIXES = ("replace-with-", "change-me", "changeme")
+_AUTH_SESSION_PATH = "/api/v1/query/auth/session"
+_AUTH_LOGIN_PATH = "/api/v1/command/auth/login"
+_AUTH_LOGOUT_PATH = "/api/v1/command/auth/logout"
 
 
 def _env_flag(value: str | None, *, default: bool) -> bool:
     if value is None or not value.strip():
         return default
     return value.strip().lower() not in _FALSE_ENV_VALUES
+
+
+def _is_placeholder_secret(value: str) -> bool:
+    normalized = value.strip().casefold()
+    return normalized.startswith(_PLACEHOLDER_SECRET_PREFIXES)
 
 
 @dataclass(frozen=True, slots=True)
@@ -52,6 +65,14 @@ class _AdminAuthConfig:
             raise RuntimeError(
                 "CWS_ADMIN_PASSWORD is required when "
                 "CWS_ADMIN_SESSION_SECRET is configured"
+            )
+        if password and _is_placeholder_secret(password):
+            raise RuntimeError(
+                "CWS_ADMIN_PASSWORD must not use a documented placeholder value"
+            )
+        if session_secret and _is_placeholder_secret(session_secret):
+            raise RuntimeError(
+                "CWS_ADMIN_SESSION_SECRET must not use a documented placeholder value"
             )
         if password and len(password) < 12:
             raise RuntimeError(
@@ -162,7 +183,7 @@ class _AdminAuth:
     def login_response(self) -> JSONResponse:
         session = self.create_session()
         response = JSONResponse(
-            self.session_payload(session),
+            ok_response(self.session_payload(session)),
             headers={"Cache-Control": "no-store"},
         )
         response.set_cookie(
@@ -182,7 +203,7 @@ class _AdminAuth:
             with self._sessions_lock:
                 self._sessions.pop(session.session_id, None)
         response = JSONResponse(
-            self.anonymous_payload(),
+            ok_response(self.anonymous_payload()),
             headers={"Cache-Control": "no-store"},
         )
         response.delete_cookie(
@@ -283,11 +304,23 @@ class _LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=1024)
 
 
+def _public_validation_errors(exc: RequestValidationError) -> list[dict[str, object]]:
+    return [
+        {
+            key: error[key]
+            for key in ("type", "loc", "msg")
+            if key in error
+        }
+        for error in exc.errors()
+    ]
+
+
 def _auth_error(
     *,
     status_code: int,
     code: str,
     message: str,
+    details: dict[str, object] | None = None,
     headers: Mapping[str, str] | None = None,
 ) -> JSONResponse:
     response_headers = {"Cache-Control": "no-store"}
@@ -296,11 +329,12 @@ def _auth_error(
     return JSONResponse(
         status_code=status_code,
         content={
-            "detail": {
+            "ok": False,
+            "error": {
                 "code": code,
                 "message": message,
-                "details": {},
-            }
+                "details": details or {},
+            },
         },
         headers=response_headers,
     )
@@ -314,18 +348,21 @@ class _AdminAuthMiddleware:
     async def __call__(self, scope, receive, send):
         path = scope.get("path", "")
         method = scope.get("method", "")
+        normalized_path = path.rstrip("/")
         if (
             self._auth.enabled
             and scope["type"] == "http"
             and method != "OPTIONS"
             and (
-                path.startswith("/api/v1/command/")
-                or path.rstrip("/") == "/api/v1/query/saves"
-                or path.rstrip("/") == "/api/auth/logout"
-                or path.rstrip("/").startswith("/api/settings/llm")
+                (
+                    path.startswith("/api/v1/command/")
+                    and normalized_path != _AUTH_LOGIN_PATH
+                )
+                or normalized_path == "/api/v1/query/saves"
+                or normalized_path.startswith("/api/settings/llm")
                 or (
                     (
-                        path.rstrip("/") == "/api/settings"
+                        normalized_path == "/api/settings"
                         or path.startswith("/api/settings/")
                     )
                     and method not in {"GET", "HEAD"}
@@ -371,19 +408,38 @@ def install_admin_auth(
 
     app.add_middleware(_AdminAuthMiddleware, auth=auth)
 
-    @router.get("/api/auth/session")
+    @app.exception_handler(RequestValidationError)
+    async def handle_request_validation_error(
+        request: Request,
+        exc: RequestValidationError,
+    ):
+        if request.url.path.rstrip("/") == _AUTH_LOGIN_PATH:
+            return _auth_error(
+                status_code=422,
+                code="ADMIN_LOGIN_REQUEST_INVALID",
+                message="Administrator login request is invalid",
+                details={"errors": _public_validation_errors(exc)},
+                headers={"Cache-Control": "no-store"},
+            )
+        return await request_validation_exception_handler(request, exc)
+
+    @router.get(_AUTH_SESSION_PATH)
     def get_auth_session(request: Request):
         session = auth.find_session(request)
         return JSONResponse(
-            auth.session_payload(session) if session is not None else auth.anonymous_payload(),
+            ok_response(
+                auth.session_payload(session)
+                if session is not None
+                else auth.anonymous_payload()
+            ),
             headers={"Cache-Control": "no-store"},
         )
 
-    @router.post("/api/auth/login")
+    @router.post(_AUTH_LOGIN_PATH)
     def login(request: Request, req: _LoginRequest):
         if not auth.enabled:
             return JSONResponse(
-                auth.anonymous_payload(),
+                ok_response(auth.anonymous_payload()),
                 headers={"Cache-Control": "no-store"},
             )
         attempt = auth.attempt_login(request, req.password)
@@ -402,7 +458,7 @@ def install_admin_auth(
             )
         return auth.login_response()
 
-    @router.post("/api/auth/logout")
+    @router.post(_AUTH_LOGOUT_PATH)
     def logout(request: Request):
         return auth.logout_response(request)
 

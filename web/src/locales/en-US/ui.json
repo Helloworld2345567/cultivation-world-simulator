@@ -48,21 +48,6 @@
   "about_contributors_desc": "Thanks to all the creators who contributed to this open-source project!",
   "auto_save": "Auto Save",
   "auto_save_desc": "Automatically save the game every decade in January",
-  "admin_auth": {
-    "visitor_status": "Visitor · Read-only",
-    "admin_status": "Administrator · Editable",
-    "local_status": "Local administrator mode",
-    "password_label": "Administrator password",
-    "password_placeholder": "Enter the administrator password",
-    "login": "Sign in",
-    "logging_in": "Signing in…",
-    "logout": "Leave administrator mode",
-    "logging_out": "Signing out…",
-    "admin_hint": "You can currently edit and control this world.",
-    "read_only_hint": "Visitors can only observe the world. Sign in as administrator to perform this action.",
-    "login_failed": "Sign-in failed. Check the administrator password.",
-    "logout_failed": "Sign-out failed. Please try again later."
-  },
   "create_avatar": {
     "fetch_failed": "Failed to fetch game data",
     "create_success": "Character created successfully",

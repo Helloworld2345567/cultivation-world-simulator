@@ -268,8 +268,10 @@ def test_cloudflare_compose_keeps_backend_private_and_frontend_loopback_only():
     assert 'expose:' in backend_block
     assert '"8002"' in backend_block
     assert '"8002:8002"' not in compose_text
-    assert '"127.0.0.1:8123:80"' in frontend_block
-    assert '"8123:80"' not in frontend_block.replace('"127.0.0.1:8123:80"', '')
+    loopback_port = '"127.0.0.1:${CWS_FRONTEND_PORT:-8123}:80"'
+    assert loopback_port in frontend_block
+    assert '"8123:80"' not in frontend_block.replace(loopback_port, '')
+    assert '"${CWS_DOCKER_DATA_DIR:-./docker-data}:/data"' in backend_block
 
 
 def test_cloudflare_compose_enforces_public_runtime_security_settings():
@@ -312,12 +314,13 @@ def test_cloudflare_deployment_documentation_is_linked_from_all_readmes():
         assert "cloudflare-tunnel-deployment.md" in content, readme
 
 
-def test_cloudflare_env_example_contains_placeholders_only():
+def test_cloudflare_env_example_leaves_required_secrets_empty():
     env_example = (get_project_root() / "deploy" / "cloudflare.env.example").read_text(encoding="utf-8")
 
-    assert "CWS_ADMIN_PASSWORD=replace-" in env_example
-    assert "CWS_ADMIN_SESSION_SECRET=replace-" in env_example
-    assert "CLOUDFLARE_TUNNEL_TOKEN=replace-" in env_example
+    assert "CWS_ADMIN_PASSWORD=\n" in env_example
+    assert "CWS_ADMIN_SESSION_SECRET=\n" in env_example
+    assert "CLOUDFLARE_TUNNEL_TOKEN=\n" in env_example
+    assert "replace-with-" not in env_example
     assert "CWS_ALLOWED_ORIGINS=https://world.ym0v0.com" in env_example
     assert "CLOUDFLARED_IMAGE=cloudflare/cloudflared@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38" in env_example
     assert "cloudflare/cloudflared:latest" not in env_example
