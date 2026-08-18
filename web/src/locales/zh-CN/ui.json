@@ -48,6 +48,21 @@
   "about_contributors_desc": "感谢所有参与了开源的创作者们！",
   "auto_save": "自动保存",
   "auto_save_desc": "每逢十年的 1 月自动进行存档",
+  "admin_auth": {
+    "visitor_status": "游客·只读",
+    "admin_status": "管理员·可编辑",
+    "local_status": "本地管理模式",
+    "password_label": "管理员密码",
+    "password_placeholder": "输入管理员密码",
+    "login": "登录",
+    "logging_in": "登录中…",
+    "logout": "退出管理员",
+    "logging_out": "退出中…",
+    "admin_hint": "当前可以编辑和控制此世界。",
+    "read_only_hint": "游客模式只能观察世界，登录管理员后可执行此操作。",
+    "login_failed": "登录失败，请检查管理员密码。",
+    "logout_failed": "退出失败，请稍后重试。"
+  },
   "create_avatar": {
     "fetch_failed": "获取游戏数据失败",
     "create_success": "角色创建成功",

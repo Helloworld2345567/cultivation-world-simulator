@@ -6,8 +6,10 @@ import { useSettingStore } from '@/stores/setting'
 
 const props = withDefaults(defineProps<{
   variant?: 'splash' | 'settings'
+  readonly?: boolean
 }>(), {
   variant: 'settings',
+  readonly: false,
 })
 
 const { t } = useI18n()
@@ -52,10 +54,12 @@ function getLocaleShortLabel(locale: AppLocale | string) {
 }
 
 function toggleOpen() {
+  if (props.readonly) return
   isOpen.value = !isOpen.value
 }
 
 async function handleSelect(localeCode: string) {
+  if (props.readonly) return
   await settingStore.setLocale(localeCode)
   isOpen.value = false
   shouldPulse.value = false
@@ -127,6 +131,7 @@ onBeforeUnmount(() => {
       class="locale-trigger locale-trigger--splash"
       :aria-expanded="isOpen"
       :aria-label="splashAriaLabel"
+      :disabled="props.readonly"
       @click="toggleOpen"
     >
       <span class="locale-trigger__icon" aria-hidden="true">
@@ -152,6 +157,7 @@ onBeforeUnmount(() => {
         class="locale-trigger locale-trigger--settings"
         :aria-expanded="isOpen"
         :aria-label="splashAriaLabel"
+        :disabled="props.readonly"
         @click="toggleOpen"
       >
         <span class="locale-trigger__icon" aria-hidden="true">
@@ -180,6 +186,7 @@ onBeforeUnmount(() => {
           class="locale-option"
           :class="{ 'is-active': locale.code === settingStore.locale }"
           role="menuitemradio"
+          :disabled="props.readonly"
           :aria-checked="locale.code === settingStore.locale"
           @click="handleSelect(locale.code)"
         >

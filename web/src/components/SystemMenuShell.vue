@@ -12,12 +12,15 @@ import infoIcon from '@/assets/icons/ui/lucide/info.svg'
 import ellipsisIcon from '@/assets/icons/ui/lucide/ellipsis.svg'
 import xIcon from '@/assets/icons/ui/lucide/x.svg'
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   visible: boolean
   activeTab: SystemMenuTab
   gameInitialized: boolean
   closable?: boolean
-}>()
+  canWrite?: boolean
+}>(), {
+  canWrite: true,
+})
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -27,11 +30,11 @@ const emit = defineEmits<{
 const { t } = useI18n()
 
 const tabs = computed((): Array<{ key: SystemMenuTab; label: string; disabled: boolean; icon: string }> => ([
-  { key: 'start', label: t('ui.start_game'), disabled: false, icon: sparklesIcon },
-  { key: 'load', label: t('ui.load_game'), disabled: false, icon: folderOpenIcon },
-  { key: 'save', label: t('ui.save_game'), disabled: !props.gameInitialized, icon: saveIcon },
-  { key: 'characters', label: t('ui.character_management'), disabled: !props.gameInitialized, icon: userPlusIcon },
-  { key: 'llm', label: t('ui.llm_settings'), disabled: false, icon: botIcon },
+  { key: 'start', label: t('ui.start_game'), disabled: !props.canWrite, icon: sparklesIcon },
+  { key: 'load', label: t('ui.load_game'), disabled: !props.canWrite, icon: folderOpenIcon },
+  { key: 'save', label: t('ui.save_game'), disabled: !props.canWrite || !props.gameInitialized, icon: saveIcon },
+  { key: 'characters', label: t('ui.character_management'), disabled: !props.canWrite || !props.gameInitialized, icon: userPlusIcon },
+  { key: 'llm', label: t('ui.llm_settings'), disabled: !props.canWrite, icon: botIcon },
   { key: 'settings', label: t('ui.settings'), disabled: false, icon: settingsIcon },
   { key: 'about', label: t('ui.about'), disabled: false, icon: infoIcon },
   { key: 'other', label: t('ui.other'), disabled: false, icon: ellipsisIcon },

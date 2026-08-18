@@ -7,7 +7,10 @@ const PROGRESS_RING_RADIUS = 90
 const PROGRESS_RING_CIRCUMFERENCE = 2 * Math.PI * PROGRESS_RING_RADIUS
 const FAKE_PROGRESS_SECONDS_PER_PERCENT = 2
 
-export function useLoadingOverlayState(status: () => InitStatusDTO | null) {
+export function useLoadingOverlayState(
+  status: () => InitStatusDTO | null,
+  canRetry: () => boolean,
+) {
   const { t, tm } = useI18n()
 
   const tipsList = computed<string[]>(() => {
@@ -59,6 +62,7 @@ export function useLoadingOverlayState(status: () => InitStatusDTO | null) {
   })
 
   async function handleRetry() {
+    if (!canRetry()) return
     localElapsed.value = 0
     displayProgress.value = 0
     try {

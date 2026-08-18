@@ -15,6 +15,7 @@ import type { useWorldStore } from '@/stores/world'
 interface SocketRouterDeps {
   worldStore: ReturnType<typeof useWorldStore>
   uiStore: ReturnType<typeof useUiStore>
+  canWrite?: boolean
 }
 
 const translate = i18n.global.t
@@ -35,6 +36,7 @@ function handleToastMessage(data: ToastSocketMessage) {
 }
 
 function handleLlmConfigRequired(data: LLMConfigRequiredSocketMessage, deps: SocketRouterDeps) {
+  if (deps.canWrite === false) return
   const errorMessage = data.error || translate('ui.llm_connection_failed_config')
   logWarn('SocketRouter llm config required', errorMessage)
   deps.uiStore.setLlmConfigError?.(errorMessage)

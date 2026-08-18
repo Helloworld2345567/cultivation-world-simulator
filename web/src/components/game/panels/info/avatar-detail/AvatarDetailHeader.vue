@@ -1,7 +1,7 @@
 <script setup lang="ts">
 import pencilLineIcon from '@/assets/icons/ui/lucide/pencil-line.svg'
 
-defineProps<{
+withDefaults(defineProps<{
   name: string
   portraitUrl: string
   realmText: string
@@ -10,7 +10,10 @@ defineProps<{
   portraitTitle: string
   portraitAlt: string
   canonicalRealmLabel: string
-}>()
+  editable?: boolean
+}>(), {
+  editable: true,
+})
 
 const emit = defineEmits<{
   (e: 'edit-portrait'): void
@@ -19,24 +22,25 @@ const emit = defineEmits<{
 
 <template>
   <div class="avatar-header">
-    <button
-      class="portrait-button"
-      type="button"
-      :title="portraitTitle"
-      :aria-label="portraitTitle"
-      @click="emit('edit-portrait')"
+    <component
+      :is="editable ? 'button' : 'div'"
+      :class="editable ? 'portrait-button' : 'portrait-static'"
+      :type="editable ? 'button' : undefined"
+      :title="editable ? portraitTitle : undefined"
+      :aria-label="editable ? portraitTitle : undefined"
+      @click="editable && emit('edit-portrait')"
     >
       <div class="portrait-shell">
         <img v-if="portraitUrl" class="portrait-image" :src="portraitUrl" :alt="portraitAlt" />
         <div v-else class="portrait-fallback">{{ name.slice(0, 1) }}</div>
-        <div class="portrait-overlay">
+        <div v-if="editable" class="portrait-overlay">
           <span class="portrait-overlay-text">{{ portraitTitle }}</span>
           <span class="portrait-edit-badge">
             <span class="portrait-edit-icon" :style="{ '--icon-url': `url(${pencilLineIcon})` }" aria-hidden="true"></span>
           </span>
         </div>
       </div>
-    </button>
+    </component>
     <div class="avatar-header-meta">
       <div class="avatar-name">{{ name }}</div>
       <div class="avatar-realm">{{ realmText }}</div>
@@ -62,11 +66,16 @@ const emit = defineEmits<{
   border: 1px solid rgba(255, 255, 255, 0.06);
 }
 
-.portrait-button {
+.portrait-button,
+.portrait-static {
   border: none;
   background: transparent;
   padding: 0;
   cursor: pointer;
+}
+
+.portrait-static {
+  cursor: default;
 }
 
 .portrait-shell {

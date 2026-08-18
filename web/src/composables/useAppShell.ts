@@ -11,6 +11,7 @@ interface UseAppShellOptions {
   menuDefaultTab: Ref<SystemMenuTab>
   menuContext: Ref<SystemMenuContext>
   isManualPaused: Ref<boolean>
+  canWrite: Ref<boolean>
   performStartupCheck: (context?: SystemMenuContext) => void | Promise<void>
   handleMenuClose: () => void
   onGameBgmStart: () => void
@@ -116,7 +117,9 @@ export function useAppShell(options: UseAppShellOptions) {
     forcedScene.value = null
     options.onGameBgmStart()
     options.isManualPaused.value = false
-    await options.onResumeGame()
+    if (options.canWrite.value) {
+      await options.onResumeGame()
+    }
   }, { immediate: true })
 
   watch([baseScene, options.gameInitialized], ([nextBaseScene, initialized]) => {

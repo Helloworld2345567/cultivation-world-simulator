@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import { computed, onMounted, onUnmounted, watch } from 'vue'
+import { storeToRefs } from 'pinia'
 import { NConfigProvider, darkTheme, NMessageProvider, NDialogProvider } from 'naive-ui'
 import { systemApi } from './api/modules/system'
 import { useI18n } from 'vue-i18n'
@@ -15,6 +16,7 @@ import StatusBar from './components/layout/StatusBar.vue'
 import EventPanel from './components/game/panels/EventPanel.vue'
 import SystemMenu from './components/SystemMenu.vue'
 import LoadingOverlay from './components/LoadingOverlay.vue'
+import AdminAuthControl from './components/AdminAuthControl.vue'
 import menuIcon from '@/assets/icons/ui/lucide/menu.svg'
 import playIcon from '@/assets/icons/ui/lucide/play.svg'
 import pauseIcon from '@/assets/icons/ui/lucide/pause.svg'
@@ -34,11 +36,14 @@ import { useUiStore } from './stores/ui'
 import { useSettingStore } from './stores/setting'
 import { useSystemStore } from './stores/system'
 import { useRoleplayStore } from './stores/roleplay'
+import { useAuthStore } from './stores/auth'
 
 const uiStore = useUiStore()
 const settingStore = useSettingStore()
 const systemStore = useSystemStore()
 const roleplayStore = useRoleplayStore()
+const authStore = useAuthStore()
+const { canWrite } = storeToRefs(authStore)
 
 function showClosedMessage() {
   document.body.replaceChildren()
@@ -70,6 +75,7 @@ const {
   showLoading,
 } = useGameInit({
   onIdle: () => roleplayStore.reset(),
+  ready: computed(() => authStore.hydrated),
 })
 
 const {
@@ -91,11 +97,12 @@ const {
   gameInitialized,
   showMenu,
   canCloseMenu,
+  canWrite,
   openGameMenu,
   closeMenu: handleMenuClose,
 })
 
-const settingsHydrated = computed(() => settingStore.hydrated)
+const settingsHydrated = computed(() => settingStore.hydrated && authStore.hydrated)
 const roleplayPauseText = computed(() => {
   const status = roleplayStore.session.status
   if (status === 'awaiting_decision') return t('game.roleplay.pause_indicator.awaiting_decision')
@@ -123,6 +130,7 @@ const {
   menuDefaultTab,
   menuContext,
   isManualPaused,
+  canWrite,
   performStartupCheck,
   handleMenuClose,
   onGameBgmStart: () => useBgm().play('map'),
@@ -140,6 +148,8 @@ function handleSelection(target: { type: 'avatar' | 'region' | 'poi'; id: string
 }
 
 async function handleSplashAction(key: string) {
+  if (!authStore.canWrite && ['start', 'load', 'exit'].includes(key)) return
+
   if (key === 'exit') {
     const desktopBridge = window.cwsDesktop
     if (desktopBridge?.quit) {
@@ -167,6 +177,7 @@ async function handleSplashAction(key: string) {
 }
 
 async function handleReturnToMain() {
+  if (!authStore.canWrite) return
   roleplayStore.reset()
   returnToSplash()
 
@@ -186,7 +197,7 @@ function focusRoleplayDock() {
 onMounted(() => {
   window.addEventListener('keydown', onKeydown)
   syncLayoutCssVars(sidebarWidth.value)
-  settingStore.hydrate().finally(() => {
+  Promise.all([authStore.hydrate(), settingStore.hydrate()]).finally(() => {
     useAudio().init()
     useBgm().init() // 确保 BGM 系统在 App 层级初始化，避免 Watcher 被子组件卸载
   })
@@ -210,6 +221,7 @@ watch(sidebarWidth, width => {
 
         <SplashLayer 
           v-else-if="canRenderSplash" 
+          :can-write="authStore.canWrite"
           @action="handleSplashAction"
         />
 
@@ -224,7 +236,7 @@ watch(sidebarWidth, width => {
                 <!-- 顶部控制栏 -->
                 <div class="top-controls">
                   <!-- 暂停/播放按钮 -->
-                  <button class="control-btn pause-toggle" @click="toggleManualPause" :title="isManualPaused ? t('game.controls.resume') : t('game.controls.pause')">
+                  <button v-if="authStore.canWrite" class="control-btn pause-toggle" @click="toggleManualPause" :title="isManualPaused ? t('game.controls.resume') : t('game.controls.pause')">
                     <span
                       class="control-btn-icon"
                       :style="{ '--icon-url': `url(${isManualPaused ? playIcon : pauseIcon})` }"
@@ -248,7 +260,7 @@ watch(sidebarWidth, width => {
                 </div>
 
                 <button
-                  v-if="roleplayPauseText"
+                  v-if="authStore.canWrite && roleplayPauseText"
                   class="roleplay-pause-indicator"
                   type="button"
                   @click="focusRoleplayDock"
@@ -264,7 +276,7 @@ watch(sidebarWidth, width => {
                 />
                 <InfoPanelContainer />
               </div>
-              <RoleplayDock />
+              <RoleplayDock v-if="authStore.canWrite" />
             </div>
             <div
               class="sidebar-resizer"
@@ -282,6 +294,7 @@ watch(sidebarWidth, width => {
           :default-tab="menuDefaultTab"
           :game-initialized="gameInitialized"
           :closable="canCloseMenu"
+          :can-write="authStore.canWrite"
           @close="handleMenuCloseWrapper"
           @llm-ready="handleLLMReady"
           @return-to-main="handleReturnToMain"
@@ -291,7 +304,10 @@ watch(sidebarWidth, width => {
         <LoadingOverlay 
           v-if="showLoadingOverlay"
           :status="initStatus"
+          :can-write="authStore.canWrite"
         />
+
+        <AdminAuthControl />
       </n-message-provider>
     </n-dialog-provider>
   </n-config-provider>

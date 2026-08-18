@@ -1,4 +1,4 @@
-import { ref, onMounted, onUnmounted } from 'vue'
+import { ref, onMounted, onUnmounted, watch, type Ref, type WatchStopHandle } from 'vue'
 import { useSystemStore } from '@/stores/system'
 import { useWorldStore } from '@/stores/world'
 import { useSocketStore } from '@/stores/socket'
@@ -12,6 +12,7 @@ import { logError, logWarn } from '@/utils/appError'
 
 interface UseGameInitOptions {
   onIdle?: () => void
+  ready?: Ref<boolean>
 }
 
 type InitPhaseName =
@@ -43,6 +44,7 @@ export function useGameInit(options: UseGameInitOptions = {}) {
   const lastPollDurationMs = ref(0)
   
   let pollInterval: ReturnType<typeof setInterval> | null = null
+  let stopReadyWatch: WatchStopHandle | null = null
 
   function preloadBaseTexturesOnce() {
     if (texturesPreloaded.value) return
@@ -155,6 +157,7 @@ export function useGameInit(options: UseGameInitOptions = {}) {
   }
 
   function startPolling() {
+    if (pollInterval || (options.ready && !options.ready.value)) return
     pollInitStatus()
     pollInterval = setInterval(pollInitStatus, 1000)
   }
@@ -167,10 +170,18 @@ export function useGameInit(options: UseGameInitOptions = {}) {
   }
 
   onMounted(() => {
-    startPolling()
+    if (!options.ready) {
+      startPolling()
+      return
+    }
+    stopReadyWatch = watch(options.ready, (ready) => {
+      if (ready) startPolling()
+    }, { immediate: true })
   })
 
   onUnmounted(() => {
+    stopReadyWatch?.()
+    stopReadyWatch = null
     stopPolling()
     socketStore.disconnect()
   })

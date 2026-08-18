@@ -12,12 +12,15 @@ type EquipmentSlot = {
   meta?: string
 }
 
-defineProps<{
+withDefaults(defineProps<{
   slots: EquipmentSlot[]
   spiritAnimal?: EffectEntity
   emptyText: string
   adjustTitle: string
-}>()
+  adjustable?: boolean
+}>(), {
+  adjustable: true,
+})
 
 const emit = defineEmits<{
   (e: 'show-detail', item: EffectEntity | undefined): void
@@ -47,6 +50,7 @@ const emit = defineEmits<{
           />
           <div v-else class="empty-row slot-empty">{{ emptyText }}</div>
           <button
+            v-if="adjustable"
             class="adjust-btn inline"
             :title="adjustTitle"
             :aria-label="adjustTitle"

@@ -26,9 +26,16 @@ class EndpointFilter(logging.Filter):
 class ConnectionManager:
     BROADCAST_SEND_TIMEOUT_SECONDS = 2.0
 
-    def __init__(self, *, runtime=None, is_idle_shutdown_enabled=None):
+    def __init__(
+        self,
+        *,
+        runtime=None,
+        is_idle_shutdown_enabled=None,
+        is_auto_pause_enabled=None,
+    ):
         self.runtime = runtime
         self.is_idle_shutdown_enabled = is_idle_shutdown_enabled or (lambda: False)
+        self.is_auto_pause_enabled = is_auto_pause_enabled or (lambda: True)
         self.active_connections: list[WebSocket] = []
         self._shutdown_timer: threading.Timer | None = None
 
@@ -48,7 +55,8 @@ class ConnectionManager:
             self.active_connections.remove(websocket)
 
         if len(self.active_connections) == 0:
-            self._set_pause_state(True, "所有客户端已断开，自动暂停游戏以节省资源。")
+            if self.is_auto_pause_enabled():
+                self._set_pause_state(True, "所有客户端已断开，自动暂停游戏以节省资源。")
 
             if self.is_idle_shutdown_enabled():
                 print("[Auto-Control] All clients disconnected. Server will shutdown in 5 seconds...")

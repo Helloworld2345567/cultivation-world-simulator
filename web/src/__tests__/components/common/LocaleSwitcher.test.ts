@@ -73,4 +73,29 @@ describe('LocaleSwitcher', () => {
 
     expect(mockSetLocale).toHaveBeenCalledWith('en-US')
   })
+
+  it('does not open or persist a locale change in read-only mode', async () => {
+    const wrapper = mount(LocaleSwitcher, {
+      props: {
+        variant: 'splash',
+        readonly: true,
+      },
+      global: {
+        plugins: [
+          createPinia(),
+          createTestI18n({
+            ui: {
+              language_switcher_button: 'Language',
+              language_switcher_hint: 'Choose your display language',
+            },
+          }),
+        ],
+      },
+    })
+
+    await wrapper.find('.locale-trigger--splash').trigger('click')
+
+    expect(wrapper.find('.locale-panel').exists()).toBe(false)
+    expect(mockSetLocale).not.toHaveBeenCalled()
+  })
 })

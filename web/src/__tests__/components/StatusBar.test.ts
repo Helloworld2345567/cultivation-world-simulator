@@ -171,6 +171,7 @@ const StatusWidgetStub = defineComponent({
 })
 
 import StatusBar from '@/components/layout/StatusBar.vue'
+import { useAuthStore } from '@/stores/auth'
 
 describe('StatusBar', () => {
   const globalConfig = {
@@ -189,6 +190,7 @@ describe('StatusBar', () => {
 
   beforeEach(() => {
     setActivePinia(createPinia())
+    useAuthStore().$patch({ enabled: false, authenticated: false, hydrated: true })
     vi.clearAllMocks()
     vi.stubGlobal('fetch', mockFetch)
 
@@ -332,6 +334,18 @@ describe('StatusBar', () => {
       expect(mockGetPhenomenaList).toHaveBeenCalled()
     })
 
+    it('does not open the mutating selector for a spectator', async () => {
+      useAuthStore().$patch({ enabled: true, authenticated: false, hydrated: true })
+      const wrapper = mount(StatusBar, globalConfig)
+
+      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
+      await settleAsyncPanels()
+
+      expect(mockGetPhenomenaList).not.toHaveBeenCalled()
+      expect(wrapper.find('.n-modal-stub').exists()).toBe(false)
+      expect(wrapper.text()).toContain('[Test Phenomenon]')
+    })
+
     it('should show selector modal after getPhenomenaList', async () => {
       const wrapper = mount(StatusBar, globalConfig)
 
@@ -339,6 +353,20 @@ describe('StatusBar', () => {
       await settleAsyncPanels()
 
       expect(wrapper.find('.n-modal-stub').exists()).toBe(true)
+    })
+
+    it('closes the mutating selector when the administrator session is lost', async () => {
+      useAuthStore().$patch({ enabled: true, authenticated: true, hydrated: true })
+      const wrapper = mount(StatusBar, globalConfig)
+
+      await wrapper.findAll('.status-widget-stub')[1].trigger('click')
+      await settleAsyncPanels()
+      expect(wrapper.find('.n-modal-stub').exists()).toBe(true)
+
+      useAuthStore().$patch({ authenticated: false })
+      await nextTick()
+
+      expect(wrapper.find('.n-modal-stub').exists()).toBe(false)
     })
   })
 

@@ -102,6 +102,11 @@ def fresh_manager():
 class TestConnectionManager:
     """Tests for ConnectionManager class."""
 
+    def test_main_manager_disables_auto_pause_from_environment(self, monkeypatch):
+        monkeypatch.setenv("CWS_DISABLE_AUTO_PAUSE", "1")
+
+        assert main.manager.is_auto_pause_enabled() is False
+
     def test_initial_state(self, fresh_manager):
         """Test ConnectionManager starts with no connections."""
         assert len(fresh_manager.active_connections) == 0
@@ -162,6 +167,38 @@ class TestConnectionManager:
         fresh_manager.disconnect(mock_ws)
 
         assert game_instance["is_paused"] is True
+
+    def test_disconnect_last_client_can_leave_game_running(self, reset_game_instance):
+        """Public hosts can disable disconnect-driven pausing without disabling shutdown."""
+        manager = ConnectionManager(
+            runtime=main.runtime,
+            is_auto_pause_enabled=lambda: False,
+        )
+        mock_ws = AsyncMock()
+        manager.active_connections.append(mock_ws)
+        game_instance["is_paused"] = False
+
+        manager.disconnect(mock_ws)
+
+        assert game_instance["is_paused"] is False
+
+    def test_disabling_auto_pause_keeps_idle_shutdown_enabled(self, reset_game_instance):
+        manager = ConnectionManager(
+            runtime=main.runtime,
+            is_auto_pause_enabled=lambda: False,
+            is_idle_shutdown_enabled=lambda: True,
+        )
+        mock_ws = AsyncMock()
+        manager.active_connections.append(mock_ws)
+        game_instance["is_paused"] = False
+
+        with patch("src.server.host_runtime.threading.Timer") as timer_cls:
+            manager.disconnect(mock_ws)
+
+        assert game_instance["is_paused"] is False
+        timer_cls.assert_called_once()
+        assert timer_cls.call_args.args[0] == 5.0
+        timer_cls.return_value.start.assert_called_once_with()
 
     def test_disconnect_not_last_client_keeps_game_running(self, fresh_manager, reset_game_instance):
         """Test disconnecting non-last client doesn't pause game."""

@@ -46,6 +46,9 @@ def get_service_block(compose_text: str, service_name: str) -> str:
                 block.append(line)
             continue
 
+        if not line[0].isspace():
+            break
+
         next_service_match = re.match(rf"^{service_indent}([a-zA-Z0-9_-]+):\s*$", line)
         if next_service_match and next_service_match.group(1) != service_name:
             break
@@ -54,8 +57,8 @@ def get_service_block(compose_text: str, service_name: str) -> str:
     return "\n".join(block)
 
 
-def get_compose_text() -> str:
-    compose_file = get_project_root() / "docker-compose.yml"
+def get_compose_text(name: str = "docker-compose.yml") -> str:
+    compose_file = get_project_root() / name
     return compose_file.read_text(encoding="utf-8")
 
 
@@ -252,3 +255,80 @@ def test_frontend_compose_contract_depends_on_backend_and_exposes_port():
     assert "interval:" in frontend_block
     assert "timeout:" in frontend_block
     assert "retries:" in frontend_block
+
+
+def test_cloudflare_compose_keeps_backend_private_and_frontend_loopback_only():
+    compose_text = get_compose_text("docker-compose.cloudflare.yml")
+    backend_block = get_service_block(compose_text, "backend")
+    frontend_block = get_service_block(compose_text, "frontend")
+
+    assert backend_block
+    assert frontend_block
+    assert re.search(r"(?m)^    ports:\s*$", backend_block) is None
+    assert 'expose:' in backend_block
+    assert '"8002"' in backend_block
+    assert '"8002:8002"' not in compose_text
+    assert '"127.0.0.1:8123:80"' in frontend_block
+    assert '"8123:80"' not in frontend_block.replace('"127.0.0.1:8123:80"', '')
+
+
+def test_cloudflare_compose_enforces_public_runtime_security_settings():
+    compose_text = get_compose_text("docker-compose.cloudflare.yml")
+    backend_block = get_service_block(compose_text, "backend")
+
+    assert "CWS_ADMIN_PASSWORD" in backend_block
+    assert "CWS_ADMIN_SESSION_SECRET" in backend_block
+    assert 'CWS_ADMIN_COOKIE_SECURE: "1"' in backend_block
+    assert 'CWS_TRUST_CLOUDFLARE_IP: "1"' in backend_block
+    assert "CWS_ALLOWED_ORIGINS: ${CWS_ALLOWED_ORIGINS:-https://world.ym0v0.com}" in backend_block
+    assert 'CWS_DISABLE_AUTO_PAUSE: "1"' in backend_block
+    assert 'CWS_DISABLE_AUTO_SHUTDOWN: "1"' in backend_block
+
+
+def test_cloudflare_tunnel_is_pinned_and_cannot_reach_backend_network_directly():
+    compose_text = get_compose_text("docker-compose.cloudflare.yml")
+    cloudflared_block = get_service_block(compose_text, "cloudflared")
+
+    assert cloudflared_block
+    assert "cloudflare/cloudflared@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38" in cloudflared_block
+    assert "cloudflare/cloudflared:latest" not in cloudflared_block
+    assert "CLOUDFLARE_TUNNEL_TOKEN" in cloudflared_block
+    assert "TUNNEL_TOKEN:" in cloudflared_block
+    assert "- tunnel_edge" in cloudflared_block
+    assert "backend_private" not in cloudflared_block
+
+
+def test_cloudflare_deployment_documentation_is_linked_from_all_readmes():
+    project_root = get_project_root()
+    readmes = [
+        project_root / "README.md",
+        *(project_root / "docs" / "readme").glob("*_README.md"),
+    ]
+
+    assert readmes
+    for readme in readmes:
+        content = readme.read_text(encoding="utf-8")
+        assert "world.ym0v0.com" in content, readme
+        assert "cloudflare-tunnel-deployment.md" in content, readme
+
+
+def test_cloudflare_env_example_contains_placeholders_only():
+    env_example = (get_project_root() / "deploy" / "cloudflare.env.example").read_text(encoding="utf-8")
+
+    assert "CWS_ADMIN_PASSWORD=replace-" in env_example
+    assert "CWS_ADMIN_SESSION_SECRET=replace-" in env_example
+    assert "CLOUDFLARE_TUNNEL_TOKEN=replace-" in env_example
+    assert "CWS_ALLOWED_ORIGINS=https://world.ym0v0.com" in env_example
+    assert "CLOUDFLARED_IMAGE=cloudflare/cloudflared@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38" in env_example
+    assert "cloudflare/cloudflared:latest" not in env_example
+
+
+def test_docker_context_excludes_runtime_data_and_cloudflare_secrets():
+    dockerignore = (get_project_root() / ".dockerignore").read_text(encoding="utf-8")
+
+    assert "docker-data/" in dockerignore
+    assert "deploy/cloudflare.env" in dockerignore
+    assert "deploy/cloudflare.env.local" in dockerignore
+    assert "deploy/*cloudflare*.token" in dockerignore
+    assert "deploy/*cloudflare*.json" in dockerignore
+    assert "!*.env.example" in dockerignore

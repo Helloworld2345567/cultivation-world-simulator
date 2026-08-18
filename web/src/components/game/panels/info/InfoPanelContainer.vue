@@ -2,6 +2,7 @@
 import { computed, ref, watch, onMounted, onUnmounted } from 'vue';
 import { useUiStore } from '../../../../stores/ui';
 import { useI18n } from 'vue-i18n';
+import { useAuthStore } from '@/stores/auth';
 import xIcon from '@/assets/icons/ui/lucide/x.svg';
 
 const { t } = useI18n();
@@ -13,6 +14,7 @@ import SectDetailView from './SectDetail.vue';
 import POIDetailView from './POIDetail.vue';
 
 const uiStore = useUiStore();
+const authStore = useAuthStore();
 const panelRef = ref<HTMLElement | null>(null);
 let lastOpenAt = 0;
 
@@ -26,6 +28,14 @@ const currentComponent = computed(() => {
     case 'poi': return POIDetailView;
     default: return null;
   }
+});
+
+const currentComponentProps = computed(() => {
+  if (!uiStore.detailData) return {};
+  if (uiStore.selectedTarget?.type === 'avatar') {
+    return { data: uiStore.detailData, canWrite: authStore.canWrite };
+  }
+  return { data: uiStore.detailData };
 });
 
 // --- Title & Subtitle Logic ---
@@ -142,7 +152,7 @@ watch(() => uiStore.selectedTarget, (val) => {
       <div v-else-if="uiStore.detailData && currentComponent" class="content-wrapper">
         <component 
           :is="currentComponent" 
-          :data="uiStore.detailData" 
+          v-bind="currentComponentProps"
         />
       </div>
     </div>

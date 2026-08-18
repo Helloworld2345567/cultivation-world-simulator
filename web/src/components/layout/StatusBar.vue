@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import { useWorldStore } from '../../stores/world'
 import { useSocketStore } from '../../stores/socket'
+import { useAuthStore } from '@/stores/auth'
 import { ref, computed } from 'vue'
 import { useI18n } from 'vue-i18n'
 import StatusWidget from './StatusWidget.vue'
@@ -20,6 +21,7 @@ import scrollTextIcon from '@/assets/icons/ui/lucide/scroll-text.svg'
 const { t, locale } = useI18n()
 const store = useWorldStore()
 const socketStore = useSocketStore()
+const authStore = useAuthStore()
 const panelsRef = ref<InstanceType<typeof StatusBarPanels> | null>(null)
 
 type StatusBarPanelKey =
@@ -62,6 +64,7 @@ function getRarityColor(rarity: string) {
   return PHENOMENON_RARITY_COLORS[rarity] ?? STATUS_BAR_COLORS.neutral
 }
 async function openPhenomenonSelector() {
+  if (!authStore.canWrite) return
   await store.getPhenomenaList()
   void openPanel('phenomenonSelector')
 }

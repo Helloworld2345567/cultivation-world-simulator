@@ -4,8 +4,10 @@ export { avatarApi, type HoverParams } from './modules/avatar';
 export { systemApi } from './modules/system';
 export { llmApi } from './modules/llm';
 export { eventApi } from './modules/event';
+export { authApi } from './modules/auth';
 
 export type { 
+  AuthSessionDTO,
   AppSettingsDTO,
   InitStatusDTO, 
   LLMConfigDTO, 

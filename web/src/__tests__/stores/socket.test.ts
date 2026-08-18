@@ -79,12 +79,14 @@ vi.mock('@/stores/ui', () => ({
 }))
 
 import { useSocketStore } from '@/stores/socket'
+import { useAuthStore } from '@/stores/auth'
 
 describe('useSocketStore', () => {
   let store: ReturnType<typeof useSocketStore>
 
   beforeEach(() => {
     setActivePinia(createPinia())
+    useAuthStore().$patch({ enabled: false, authenticated: false, hydrated: true })
     store = useSocketStore()
 
     // Reset mocks and callbacks.

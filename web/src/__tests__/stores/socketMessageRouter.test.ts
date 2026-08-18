@@ -55,6 +55,17 @@ describe('socketMessageRouter', () => {
     expect(mockMessage.error).toHaveBeenCalledWith('LLM required')
   })
 
+  it('does not force a protected LLM menu on spectators', () => {
+    routeSocketMessage(
+      { type: 'llm_config_required', error: 'LLM required' },
+      { worldStore: worldStore as any, uiStore: uiStore as any, canWrite: false },
+    )
+
+    expect(uiStore.openSystemMenu).not.toHaveBeenCalled()
+    expect(uiStore.setLlmConfigError).not.toHaveBeenCalled()
+    expect(mockMessage.error).not.toHaveBeenCalled()
+  })
+
   it('applies an immediate avatar delta and refreshes the selected detail', () => {
     uiStore.selectedTarget = { type: 'avatar', id: 'a1' }
     routeSocketMessage(

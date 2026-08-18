@@ -4,8 +4,9 @@ import { useI18n } from 'vue-i18n'
 import { useWorldStore } from '@/stores/world'
 import { PHENOMENON_RARITY_COLORS, STATUS_BAR_COLORS } from '@/constants/uiColors'
 
-defineProps<{
+const props = defineProps<{
   show: boolean
+  canWrite: boolean
 }>()
 
 const emit = defineEmits<{
@@ -25,6 +26,7 @@ function handleShowChange(value: boolean) {
 }
 
 async function handleSelect(id: number, name: string) {
+  if (!props.canWrite) return
   try {
     await store.changePhenomenon(id)
     message.success(t('game.status_bar.change_success', { name }))
@@ -43,7 +45,7 @@ async function handleSelect(id: number, name: string) {
     :title="t('game.status_bar.selector_title')"
     style="width: 700px; max-height: 80vh; overflow-y: auto;"
   >
-    <n-list hoverable clickable>
+    <n-list hoverable :clickable="props.canWrite">
       <n-list-item v-for="p in store.phenomenaList" :key="p.id" @click="handleSelect(p.id, p.name)" v-sound:select>
         <div class="list-item-content">
           <div class="item-left">

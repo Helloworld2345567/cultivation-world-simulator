@@ -145,6 +145,8 @@ docker-compose up -d --build
 
 バックエンドコンテナは `CWS_DATA_DIR=/data` を通じてユーザーデータを一元的に永続化します。これには設定、秘密鍵、アーカイブ、ログが含まれます。デフォルトでホストの `./docker-data` にマッピングされており、`docker compose down` を実行した後に再度 `up` しても、これらのデータは保持されます。
 
+安全に公開する場合は、専用の `docker-compose.cloudflare.yml` を使用してください。デフォルトのドメインは `world.ym0v0.com` です。バックエンドはホストポートを公開せず、フロントエンドは `127.0.0.1:8123` のみにバインドし、すべての公開トラフィックは Cloudflare Tunnel sidecar を経由します。デプロイ前に管理者認証と Tunnel 認証情報を設定してください。詳細は [Cloudflare Tunnel 公開手順](../cloudflare-tunnel-deployment.md) を参照してください。
+
 <details>
 <summary><b>LAN/モバイルアクセス設定 (クリックで展開)</b></summary>
 

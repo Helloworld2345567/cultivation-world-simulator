@@ -25,9 +25,12 @@ import sparklesIcon from '@/assets/icons/ui/lucide/sparkles.svg';
 import triangleAlertIcon from '@/assets/icons/ui/lucide/triangle-alert.svg';
 
 const { t, locale } = useI18n();
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   data: AvatarDetail;
-}>();
+  canWrite?: boolean;
+}>(), {
+  canWrite: true,
+});
 
 const uiStore = useUiStore();
 
@@ -67,6 +70,7 @@ const {
       @close="secondaryItem = null" 
     />
     <AvatarAdjustPanel
+      v-if="props.canWrite"
       :avatar-id="data.id"
       :category="adjustCategory"
       :current-item="currentAdjustItem"
@@ -75,6 +79,7 @@ const {
       @updated="uiStore.refreshDetail()"
     />
     <AvatarPortraitPanel
+      v-if="props.canWrite"
       :avatar-id="data.id"
       :gender="data.gender"
       :race="data.race?.id"
@@ -99,6 +104,7 @@ const {
         :portrait-title="t('game.info_panel.avatar.portrait.entry')"
         :portrait-alt="t('game.info_panel.avatar.portrait.preview_alt')"
         :canonical-realm-label="t('game.info_panel.avatar.stats.canonical_realm', { value: avatarCanonicalRealmText })"
+        :editable="props.canWrite"
         @edit-portrait="showPortraitPanel = true"
       />
 
@@ -114,9 +120,9 @@ const {
         }"
       />
 
-      <RoleplayPanel v-if="!data.is_dead" :avatar="data" />
+      <RoleplayPanel v-if="props.canWrite && !data.is_dead" :avatar="data" />
 
-      <div class="actions-bar" v-if="!data.is_dead">
+      <div class="actions-bar" v-if="props.canWrite && !data.is_dead">
         <button class="btn primary" @click="showObjectiveModal = true">{{ t('game.info_panel.avatar.set_objective') }}</button>
         <button class="btn" @click="handleClearObjective">{{ t('game.info_panel.avatar.clear_objective') }}</button>
       </div>
@@ -151,7 +157,7 @@ const {
             <span class="section-title-icon" :style="{ '--icon-url': `url(${messageCircleIcon})` }" aria-hidden="true"></span>
             {{ t('game.info_panel.avatar.sections.traits') }}
           </div>
-          <button class="adjust-btn" :title="t('game.info_panel.avatar.adjust.entry')" :aria-label="t('game.info_panel.avatar.adjust.entry')" @click="openAdjustPanel('personas')">
+          <button v-if="props.canWrite" class="adjust-btn" :title="t('game.info_panel.avatar.adjust.entry')" :aria-label="t('game.info_panel.avatar.adjust.entry')" @click="openAdjustPanel('personas')">
             <span class="adjust-icon" :style="{ '--icon-url': `url(${pencilLineIcon})` }" aria-hidden="true"></span>
           </button>
         </div>
@@ -164,6 +170,7 @@ const {
         :spirit-animal="data.spirit_animal"
         :empty-text="t('game.info_panel.avatar.empty_short')"
         :adjust-title="t('game.info_panel.avatar.adjust.entry')"
+        :adjustable="props.canWrite"
         @show-detail="showDetail"
         @adjust="openAdjustPanel"
       />
@@ -211,7 +218,7 @@ const {
     </div>
 
     <AvatarObjectiveModal
-      v-if="showObjectiveModal"
+      v-if="props.canWrite && showObjectiveModal"
       v-model="objectiveContent"
       :title="t('game.info_panel.avatar.modals.set_long_term')"
       :placeholder="t('game.info_panel.avatar.modals.placeholder')"

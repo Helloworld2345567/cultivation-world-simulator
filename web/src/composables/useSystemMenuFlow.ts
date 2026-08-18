@@ -1,5 +1,6 @@
 import { llmApi } from '@/api'
 import { useUiStore, type SystemMenuContext } from '@/stores/ui'
+import { useAuthStore } from '@/stores/auth'
 import { storeToRefs } from 'pinia'
 import { message } from '@/utils/discreteApi'
 import { logError } from '@/utils/appError'
@@ -7,6 +8,7 @@ import i18n from '@/locales'
 
 export function useSystemMenuFlow() {
   const uiStore = useUiStore()
+  const authStore = useAuthStore()
   const translate = i18n.global.t
 
   const {
@@ -18,6 +20,10 @@ export function useSystemMenuFlow() {
 
   async function performStartupCheck(context: SystemMenuContext = 'game') {
     uiStore.openSystemMenu('start', true, context)
+
+    if (!authStore.canWrite) {
+      return
+    }
 
     try {
       const res = await llmApi.fetchStatus()
@@ -44,6 +50,7 @@ export function useSystemMenuFlow() {
   }
 
   function openLLMConfig(context: SystemMenuContext = 'game') {
+    if (!authStore.canWrite) return
     uiStore.openSystemMenu('llm', false, context)
   }
 

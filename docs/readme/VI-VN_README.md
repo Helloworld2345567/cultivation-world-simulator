@@ -145,6 +145,8 @@ Truy cập frontend: `http://localhost:8123`
 
 Backend container dùng `CWS_DATA_DIR=/data` để lưu bền vững dữ liệu người dùng, bao gồm cài đặt, khóa bí mật, save và log. Mặc định đã ánh xạ tới đường dẫn máy chủ `./docker-data`, nên dữ liệu vẫn còn sau khi chạy `docker compose down` rồi `up` lại.
 
+Để phát hành công khai an toàn, hãy dùng `docker-compose.cloudflare.yml` riêng. Tên miền mặc định là `world.ym0v0.com`: backend không công bố cổng máy chủ, frontend chỉ liên kết với `127.0.0.1:8123`, và toàn bộ lưu lượng công khai đi qua Cloudflare Tunnel sidecar. Hãy cấu hình xác thực quản trị viên và thông tin Tunnel trước khi triển khai; xem [hướng dẫn Cloudflare Tunnel](../cloudflare-tunnel-deployment.md).
+
 <details>
 <summary><b>Cấu hình truy cập qua mạng LAN / điện thoại (nhấn để mở)</b></summary>
 

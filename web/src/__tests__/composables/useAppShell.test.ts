@@ -27,6 +27,7 @@ function createShell(overrides: Partial<Parameters<typeof useAppShell>[0]> = {})
   const menuDefaultTab = ref<SystemMenuTab>('load')
   const menuContext = ref<SystemMenuContext>('game')
   const isManualPaused = ref(true)
+  const canWrite = ref(true)
   const performStartupCheck = vi.fn()
   const handleMenuClose = vi.fn(() => {
     showMenu.value = false
@@ -44,6 +45,7 @@ function createShell(overrides: Partial<Parameters<typeof useAppShell>[0]> = {})
     menuDefaultTab,
     menuContext,
     isManualPaused,
+    canWrite,
     performStartupCheck,
     handleMenuClose,
     onGameBgmStart,
@@ -61,6 +63,7 @@ function createShell(overrides: Partial<Parameters<typeof useAppShell>[0]> = {})
     menuDefaultTab,
     menuContext,
     isManualPaused,
+    canWrite,
     performStartupCheck,
     handleMenuClose,
     onGameBgmStart,
@@ -142,6 +145,17 @@ describe('useAppShell', () => {
     expect(onGameBgmStart).toHaveBeenCalledTimes(1)
     expect(onResumeGame).toHaveBeenCalledTimes(1)
     expect(isManualPaused.value).toBe(false)
+  })
+
+  it('does not resume the shared world when a spectator joins an initialized game', async () => {
+    const { initStatus, gameInitialized, canWrite, onResumeGame } = createShell()
+    canWrite.value = false
+    initStatus.value = makeStatus({ status: 'ready' })
+
+    gameInitialized.value = true
+    await Promise.resolve()
+
+    expect(onResumeGame).not.toHaveBeenCalled()
   })
 
   it('does not flash loading when initial non-idle status quickly settles back to idle', async () => {

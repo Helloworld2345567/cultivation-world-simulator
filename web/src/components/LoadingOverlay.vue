@@ -9,6 +9,7 @@ const { t } = useI18n()
 
 const props = defineProps<{
   status: InitStatusDTO | null
+  canWrite: boolean
 }>()
 
 const {
@@ -23,7 +24,10 @@ const {
   circumference,
   strokeDashoffset,
   handleRetry,
-} = useLoadingOverlayState(() => props.status)
+} = useLoadingOverlayState(
+  () => props.status,
+  () => props.canWrite,
+)
 </script>
 
 <template>
@@ -101,7 +105,7 @@ const {
       <!-- 错误信息 -->
       <div v-if="isError" class="error-section">
         <p class="error-message">{{ errorMessage }}</p>
-        <button class="retry-btn" @click="handleRetry">
+        <button v-if="props.canWrite" class="retry-btn" @click="handleRetry">
           <span class="retry-icon" :style="{ '--icon-url': `url(${refreshIcon})` }" aria-hidden="true"></span>
           {{ t('loading.retry') }}
         </button>

@@ -6,6 +6,12 @@ import { useBgm } from '../composables/useBgm'
 import { withBasePublicPath } from '@/utils/assetUrls'
 import LocaleSwitcher from '@/components/common/LocaleSwitcher.vue'
 
+const props = withDefaults(defineProps<{
+  canWrite?: boolean
+}>(), {
+  canWrite: true,
+})
+
 // 定义事件
 const emit = defineEmits<{
   (e: 'action', key: string): void
@@ -46,22 +52,23 @@ onMounted(() => {
 
 // 定义按钮列表
 const menuOptions = computed(() => [
-  { label: t('ui.start_game'), subLabel: t('splash.subtitle_start_en'), key: 'start', disabled: false },
-  { label: t('ui.load_game'), subLabel: t('splash.subtitle_load_en'), key: 'load', disabled: false },
+  { label: t('ui.start_game'), subLabel: t('splash.subtitle_start_en'), key: 'start', disabled: !props.canWrite },
+  { label: t('ui.load_game'), subLabel: t('splash.subtitle_load_en'), key: 'load', disabled: !props.canWrite },
   { label: t('ui.achievements'), subLabel: t('splash.subtitle_achievements_en'), key: 'achievements', disabled: true },
   { label: t('ui.settings'), subLabel: t('splash.subtitle_settings_en'), key: 'settings', disabled: false },
   { label: t('ui.about'), subLabel: t('splash.subtitle_about_en'), key: 'about', disabled: false },
-  { label: t('ui.exit'), subLabel: t('splash.subtitle_exit_en'), key: 'exit', disabled: false }
+  { label: t('ui.exit'), subLabel: t('splash.subtitle_exit_en'), key: 'exit', disabled: !props.canWrite }
 ])
 
 function handleClick(key: string) {
+  if (!props.canWrite && ['start', 'load', 'exit'].includes(key)) return
   emit('action', key)
 }
 </script>
 
 <template>
   <div class="splash-container">
-    <LocaleSwitcher variant="splash" />
+    <LocaleSwitcher variant="splash" :readonly="!props.canWrite" />
     <video
       ref="videoRef"
       class="splash-video"
@@ -89,6 +96,7 @@ function handleClick(key: string) {
             color="#ffffff20"
             text-color="#fff"
             class="menu-btn"
+            :data-menu-key="opt.key"
             :disabled="opt.disabled"
             v-sound="'click'"
             @click="handleClick(opt.key)"

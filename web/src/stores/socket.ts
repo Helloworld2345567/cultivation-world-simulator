@@ -3,6 +3,7 @@ import { ref } from 'vue';
 import { gameSocket } from '../api/socket';
 import { useWorldStore } from './world';
 import { useUiStore } from './ui';
+import { useAuthStore } from './auth';
 import { routeSocketMessage } from './socketMessageRouter';
 
 export const useSocketStore = defineStore('socket', () => {
@@ -17,6 +18,7 @@ export const useSocketStore = defineStore('socket', () => {
 
     const worldStore = useWorldStore();
     const uiStore = useUiStore();
+    const authStore = useAuthStore();
 
     // Listen for status
     cleanupStatus = gameSocket.onStatusChange((connected) => {
@@ -27,7 +29,7 @@ export const useSocketStore = defineStore('socket', () => {
     });
 
     cleanupMessage = gameSocket.on((data) => {
-      routeSocketMessage(data, { worldStore, uiStore });
+      routeSocketMessage(data, { worldStore, uiStore, canWrite: authStore.canWrite });
     });
 
     // Connect socket

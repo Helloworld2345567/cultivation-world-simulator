@@ -24,6 +24,12 @@ export interface ApiResponse<T> {
   data?: T; // 有些接口直接把数据铺平在顶层，需根据实际情况调整
 }
 
+export interface AuthSessionDTO {
+  enabled: boolean;
+  authenticated: boolean;
+  csrf_token: string | null;
+}
+
 // --- 具体接口响应 ---
 
 export interface InitialStateDTO {

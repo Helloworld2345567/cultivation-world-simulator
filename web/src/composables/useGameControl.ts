@@ -9,6 +9,7 @@ interface UseGameControlOptions {
   gameInitialized: Ref<boolean>
   showMenu: Ref<boolean>
   canCloseMenu: Ref<boolean>
+  canWrite: Ref<boolean>
   openGameMenu: () => void
   closeMenu: () => void
 }
@@ -26,6 +27,7 @@ export function useGameControl(options: UseGameControlOptions) {
   // - 菜单关闭时：如果没有手动暂停，恢复后端
   watch(options.showMenu, (menuVisible) => {
     if (!options.gameInitialized.value) return
+    if (!options.canWrite.value) return
     
     if (menuVisible) {
       systemStore.pause().catch((e) => logError('GameControl pause', e))
@@ -39,6 +41,7 @@ export function useGameControl(options: UseGameControlOptions) {
   watch(isConnected, (connected, wasConnected) => {
     if (!connected || wasConnected !== false) return
     if (!options.gameInitialized.value) return
+    if (!options.canWrite.value) return
     if (options.showMenu.value || isManualPaused.value) return
 
     systemStore.resume().catch((e) => logError('GameControl resume after reconnect', e))
@@ -62,6 +65,7 @@ export function useGameControl(options: UseGameControlOptions) {
   }
 
   function toggleManualPause() {
+    if (!options.canWrite.value) return
     systemStore.togglePause()
   }
 

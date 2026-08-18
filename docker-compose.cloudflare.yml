@@ -1,0 +1,97 @@
+name: cultivation-world-cloudflare
+
+services:
+  backend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.backend
+    environment:
+      PYTHONUNBUFFERED: "1"
+      CWS_DATA_DIR: /data
+      CWS_DISABLE_AUTO_SHUTDOWN: "1"
+      CWS_DISABLE_AUTO_PAUSE: "1"
+      CWS_NO_BROWSER: "1"
+      CWS_ADMIN_PASSWORD: ${CWS_ADMIN_PASSWORD:?CWS_ADMIN_PASSWORD is required}
+      CWS_ADMIN_SESSION_SECRET: ${CWS_ADMIN_SESSION_SECRET:?CWS_ADMIN_SESSION_SECRET is required}
+      CWS_ADMIN_COOKIE_SECURE: "1"
+      CWS_TRUST_CLOUDFLARE_IP: "1"
+      CWS_ALLOWED_ORIGINS: ${CWS_ALLOWED_ORIGINS:-https://world.ym0v0.com}
+    expose:
+      - "8002"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://127.0.0.1:8002/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 30s
+    volumes:
+      - ./docker-data:/data
+    networks:
+      - backend_private
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  frontend:
+    build:
+      context: .
+      dockerfile: deploy/Dockerfile.frontend
+    ports:
+      - "127.0.0.1:8123:80"
+    depends_on:
+      backend:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "wget", "--no-verbose", "--tries=1", "--spider", "http://127.0.0.1:80/api/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    volumes:
+      - ./deploy/nginx.cloudflare.conf:/etc/nginx/conf.d/default.conf:ro
+    networks:
+      - backend_private
+      - tunnel_edge
+    security_opt:
+      - no-new-privileges:true
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  cloudflared:
+    image: ${CLOUDFLARED_IMAGE:-cloudflare/cloudflared@sha256:0aa26e284f05e6c77ae375b8c9c11d9eb6a448fb7bcd8d40f31cb6176189eb38}
+    command: ["tunnel", "--no-autoupdate", "run"]
+    environment:
+      # cloudflared reads TUNNEL_TOKEN; the operator-facing name remains explicit.
+      TUNNEL_TOKEN: ${CLOUDFLARE_TUNNEL_TOKEN:?CLOUDFLARE_TUNNEL_TOKEN is required}
+    depends_on:
+      frontend:
+        condition: service_healthy
+    restart: unless-stopped
+    read_only: true
+    cap_drop:
+      - ALL
+    security_opt:
+      - no-new-privileges:true
+    networks:
+      - tunnel_edge
+    labels:
+      com.cultivation-world.public-hostname: ${CWS_PUBLIC_HOSTNAME:-world.ym0v0.com}
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+networks:
+  # cloudflared is intentionally absent from this network, so all public API
+  # traffic must pass through the frontend Nginx proxy.
+  backend_private:
+    driver: bridge
+  tunnel_edge:
+    driver: bridge

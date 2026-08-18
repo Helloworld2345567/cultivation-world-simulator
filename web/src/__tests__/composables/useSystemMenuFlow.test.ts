@@ -23,11 +23,13 @@ vi.mock('@/utils/discreteApi', () => ({
 }))
 
 import { useSystemMenuFlow } from '@/composables/useSystemMenuFlow'
+import { useAuthStore } from '@/stores/auth'
 
 describe('useSystemMenuFlow', () => {
   beforeEach(() => {
     setActivePinia(createPinia())
     vi.clearAllMocks()
+    useAuthStore().$patch({ enabled: false, authenticated: false, hydrated: true })
   })
 
   it('opens game menu in game context', () => {
@@ -61,6 +63,19 @@ describe('useSystemMenuFlow', () => {
     expect(flow.canCloseMenu.value).toBe(false)
     expect(flow.menuContext.value).toBe('splash')
     expect(mockMessageWarning).toHaveBeenCalled()
+  })
+
+  it('does not request protected LLM status or force configuration for a spectator', async () => {
+    const authStore = useAuthStore()
+    authStore.$patch({ enabled: true, authenticated: false, hydrated: true })
+    const flow = useSystemMenuFlow()
+
+    await flow.performStartupCheck('splash')
+
+    expect(mockFetchStatus).not.toHaveBeenCalled()
+    expect(flow.menuDefaultTab.value).toBe('start')
+    expect(flow.canCloseMenu.value).toBe(true)
+    expect(flow.menuContext.value).toBe('splash')
   })
 
   it('routes startup to llm tab when saved config has runtime failure', async () => {

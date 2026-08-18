@@ -177,6 +177,17 @@ docker-data/
 # Docker environment files
 .env
 
+# Cloudflare Tunnel credentials and local deployment secrets. Keep the tracked
+# example file, but never commit populated env files, tokens, certificates, or
+# remotely managed tunnel credential JSON files.
+deploy/cloudflare.env
+deploy/cloudflare.env.local
+.cloudflared/
+deploy/cloudflared/
+deploy/*cloudflare*.token
+deploy/*cloudflare*.pem
+deploy/*cloudflare*.json
+
 #############################
 # Frontend (web/)
 #############################

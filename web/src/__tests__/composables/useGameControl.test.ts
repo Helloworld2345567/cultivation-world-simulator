@@ -9,6 +9,7 @@ import { useGameControl } from '@/composables/useGameControl'
 const createTestComponent = () => {
   const showMenu = ref(false)
   const canCloseMenu = ref(true)
+  const canWrite = ref(true)
   const gameInitialized = ref(false)
   const openGameMenu = vi.fn(() => {
     showMenu.value = true
@@ -23,6 +24,7 @@ const createTestComponent = () => {
         gameInitialized,
         showMenu,
         canCloseMenu,
+        canWrite,
         openGameMenu,
         closeMenu,
       })
@@ -30,7 +32,7 @@ const createTestComponent = () => {
     template: '<div></div>',
   })
 
-  return { component, showMenu, canCloseMenu, gameInitialized, openGameMenu, closeMenu }
+  return { component, showMenu, canCloseMenu, canWrite, gameInitialized, openGameMenu, closeMenu }
 }
 
 describe('useGameControl', () => {
@@ -109,6 +111,25 @@ describe('useGameControl', () => {
 
     expect(pauseSpy).toHaveBeenCalledTimes(1)
     expect(resumeSpy).toHaveBeenCalledTimes(1)
+    wrapper.unmount()
+  })
+
+  it('does not pause or resume the shared world when a spectator opens the menu', async () => {
+    const pauseSpy = vi.spyOn(systemStore, 'pause').mockResolvedValue(undefined)
+    const resumeSpy = vi.spyOn(systemStore, 'resume').mockResolvedValue(undefined)
+    const { component, gameInitialized, showMenu, canWrite } = createTestComponent()
+    gameInitialized.value = true
+    canWrite.value = false
+    systemStore.isManualPaused = false
+    const wrapper = mount(component)
+
+    showMenu.value = true
+    await Promise.resolve()
+    showMenu.value = false
+    await Promise.resolve()
+
+    expect(pauseSpy).not.toHaveBeenCalled()
+    expect(resumeSpy).not.toHaveBeenCalled()
     wrapper.unmount()
   })
 

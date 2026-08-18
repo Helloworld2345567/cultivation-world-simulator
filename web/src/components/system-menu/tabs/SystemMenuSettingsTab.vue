@@ -1,7 +1,11 @@
 <script setup lang="ts">
 import SettingsPanel from '@/components/settings/SettingsPanel.vue'
+
+defineProps<{
+  readonly: boolean
+}>()
 </script>
 
 <template>
-  <SettingsPanel />
+  <SettingsPanel :readonly="readonly" />
 </template>

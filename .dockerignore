@@ -10,7 +10,17 @@ __pycache__
 env/
 venv/
 .env
-.env.local
+.env.*
+*.env
+*.env.*
+deploy/cloudflare.env
+deploy/cloudflare.env.local
+.cloudflared/
+deploy/cloudflared/
+deploy/*cloudflare*.token
+deploy/*cloudflare*.pem
+deploy/*cloudflare*.json
+!*.env.example
 .DS_Store
 Thumbs.db
 
@@ -32,6 +42,7 @@ build/
 # 日志
 *.log
 logs/
+docker-data/
 
 # 测试
 tests/

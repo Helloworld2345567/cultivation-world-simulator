@@ -48,6 +48,21 @@
   "about_contributors_desc": "Merci à toutes les personnes qui contribuent au projet.",
   "auto_save": "Auto-sauvegarde",
   "auto_save_desc": "Sauvegarde automatique chaque décennie, en janvier",
+  "admin_auth": {
+    "visitor_status": "Visiteur · lecture seule",
+    "admin_status": "Administrateur · modification",
+    "local_status": "Mode administrateur local",
+    "password_label": "Mot de passe administrateur",
+    "password_placeholder": "Saisir le mot de passe administrateur",
+    "login": "Se connecter",
+    "logging_in": "Connexion…",
+    "logout": "Quitter le mode administrateur",
+    "logging_out": "Déconnexion…",
+    "admin_hint": "Vous pouvez modifier et contrôler ce monde.",
+    "read_only_hint": "Les visiteurs peuvent seulement observer le monde. Connectez-vous comme administrateur pour effectuer cette action.",
+    "login_failed": "Échec de la connexion. Vérifiez le mot de passe administrateur.",
+    "logout_failed": "Échec de la déconnexion. Réessayez plus tard."
+  },
   "create_avatar": {
     "fetch_failed": "Échec de la récupération des données de jeu",
     "create_success": "Personnage créé avec succès",

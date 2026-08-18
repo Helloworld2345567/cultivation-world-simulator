@@ -6,6 +6,10 @@ import chevronRightIcon from '@/assets/icons/ui/lucide/chevron-right.svg'
 
 const { t } = useI18n()
 
+defineProps<{
+  readonly: boolean
+}>()
+
 const emit = defineEmits<{
   (e: 'return-to-main'): void
   (e: 'exit-game'): void
@@ -19,7 +23,8 @@ const emit = defineEmits<{
       <p class="description">{{ t('ui.other_options_desc') }}</p>
     </div>
 
-    <div class="other-actions">
+    <p v-if="readonly" class="readonly-hint">{{ t('ui.admin_auth.read_only_hint') }}</p>
+    <div v-else class="other-actions">
       <button class="custom-action-btn" @click="emit('return-to-main')" v-sound>
         <div class="btn-content">
           <div class="btn-icon" :style="{ '--icon-url': `url(${houseIcon})` }" aria-hidden="true"></div>
@@ -75,6 +80,11 @@ const emit = defineEmits<{
   gap: 20px;
   width: 100%;
   padding: 0 40px;
+}
+
+.readonly-hint {
+  color: #aaa;
+  text-align: center;
 }
 
 .custom-action-btn {

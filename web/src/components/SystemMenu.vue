@@ -12,12 +12,15 @@ const SystemMenuSettingsTab = defineAsyncComponent(() => import('@/components/sy
 const SystemMenuAboutTab = defineAsyncComponent(() => import('@/components/system-menu/tabs/SystemMenuAboutTab.vue'))
 const SystemMenuOtherTab = defineAsyncComponent(() => import('@/components/system-menu/tabs/SystemMenuOtherTab.vue'))
 
-const props = defineProps<{
+const props = withDefaults(defineProps<{
   visible: boolean
   defaultTab?: SystemMenuTab
   gameInitialized: boolean
   closable?: boolean
-}>()
+  canWrite?: boolean
+}>(), {
+  canWrite: true,
+})
 
 const emit = defineEmits<{
   (e: 'close'): void
@@ -26,17 +29,27 @@ const emit = defineEmits<{
   (e: 'exit-game'): void
 }>()
 
-const activeTab = ref<SystemMenuTab>(props.defaultTab || 'load')
+const protectedTabs = new Set<SystemMenuTab>(['start', 'load', 'save', 'characters', 'llm'])
+const normalizeTab = (tab: SystemMenuTab): SystemMenuTab => (
+  !props.canWrite && protectedTabs.has(tab) ? 'settings' : tab
+)
+const activeTab = ref<SystemMenuTab>(normalizeTab(props.defaultTab || 'load'))
 
 watch(() => props.defaultTab, (newTab) => {
   if (newTab) {
-    activeTab.value = newTab
+    activeTab.value = normalizeTab(newTab)
   }
 })
 
 watch(() => props.visible, (val) => {
   if (val && props.defaultTab) {
-    activeTab.value = props.defaultTab
+    activeTab.value = normalizeTab(props.defaultTab)
+  }
+})
+
+watch(() => props.canWrite, (canWrite) => {
+  if (!canWrite && protectedTabs.has(activeTab.value)) {
+    activeTab.value = 'settings'
   }
 })
 </script>
@@ -47,12 +60,14 @@ watch(() => props.visible, (val) => {
     :active-tab="activeTab"
     :game-initialized="gameInitialized"
     :closable="closable"
+    :can-write="canWrite"
     @close="emit('close')"
     @tab-change="activeTab = $event"
   >
     <SystemMenuStartTab
       v-if="activeTab === 'start'"
       :game-initialized="gameInitialized"
+      :can-write="canWrite"
     />
 
     <SystemMenuLoadTab
@@ -72,11 +87,12 @@ watch(() => props.visible, (val) => {
       @llm-ready="emit('llm-ready')"
     />
 
-    <SystemMenuSettingsTab v-else-if="activeTab === 'settings'" />
+    <SystemMenuSettingsTab v-else-if="activeTab === 'settings'" :readonly="!canWrite" />
     <SystemMenuAboutTab v-else-if="activeTab === 'about'" />
 
     <SystemMenuOtherTab
       v-else-if="activeTab === 'other'"
+      :readonly="!canWrite"
       @return-to-main="emit('return-to-main')"
       @exit-game="emit('exit-game')"
     />

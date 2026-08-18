@@ -179,6 +179,30 @@ describe('AvatarDetail', () => {
     expect(wrapper.find('.portrait-button').exists()).toBe(true)
   })
 
+  it('shows character information without edit or roleplay controls to spectators', () => {
+    const wrapper = mount(AvatarDetail, {
+      props: { data: mockAvatarData as any, canWrite: false },
+      global: {
+        plugins: [createPinia(), i18n],
+        stubs: {
+          StatItem: true,
+          RelationRow: true,
+          TagList: true,
+          SecondaryPopup: true,
+          AvatarAdjustPanel: true,
+          AvatarPortraitPanel: true,
+          RoleplayPanel: true,
+        },
+      },
+    })
+
+    expect(wrapper.find('.avatar-name').text()).toBe('Test Avatar')
+    expect(wrapper.find('.actions-bar').exists()).toBe(false)
+    expect(wrapper.find('.portrait-button').exists()).toBe(false)
+    expect(wrapper.find('roleplay-panel-stub').exists()).toBe(false)
+    expect(wrapper.find('.adjust-btn').exists()).toBe(false)
+  })
+
   it('should display dead banner if avatar is dead', () => {
     const deadAvatar = { ...mockAvatarData, is_dead: true, death_info: { reason: 'Old age' } }
     const wrapper = mount(AvatarDetail, {

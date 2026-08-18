@@ -109,4 +109,50 @@ describe('SplashLayer', () => {
       'Exit',
     ])
   })
+
+  it('keeps observation-safe pages available while disabling visitor mutations', () => {
+    const i18n = createI18n({
+      legacy: false,
+      locale: 'zh-CN',
+      messages: {
+        'zh-CN': {
+          splash: {
+            title: 'Title',
+            tagline_en: 'Subtitle',
+            subtitle_start_en: 'Start Game',
+            subtitle_load_en: 'Load Game',
+            subtitle_achievements_en: 'Achievements',
+            subtitle_settings_en: 'Settings',
+            subtitle_about_en: 'About',
+            subtitle_exit_en: 'Exit',
+          },
+          ui: {
+            start_game: 'Start',
+            load_game: 'Load',
+            achievements: 'Achievements',
+            settings: 'Settings',
+            about: 'About',
+            exit: 'Exit',
+            language_switcher_button: 'Language',
+            language_switcher_hint: 'Choose your display language',
+          },
+        },
+      },
+    })
+
+    const wrapper = mount(SplashLayer, {
+      props: { canWrite: false },
+      global: {
+        plugins: [i18n],
+        directives: { sound: () => {} },
+      },
+    })
+
+    expect(wrapper.get('[data-menu-key="start"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-menu-key="load"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-menu-key="exit"]').attributes('disabled')).toBeDefined()
+    expect(wrapper.get('[data-menu-key="settings"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('[data-menu-key="about"]').attributes('disabled')).toBeUndefined()
+    expect(wrapper.get('.locale-trigger--splash').attributes('disabled')).toBeDefined()
+  })
 })

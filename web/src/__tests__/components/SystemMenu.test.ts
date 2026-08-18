@@ -128,4 +128,34 @@ describe('SystemMenu', () => {
       expect(wrapper.emitted()).toBeTruthy()
     }
   })
+
+  it('does not mount a protected default tab for a spectator', () => {
+    const wrapper = mount(SystemMenu, {
+      props: {
+        visible: true,
+        gameInitialized: true,
+        defaultTab: 'load',
+        canWrite: false,
+      },
+      global: {
+        plugins: [createPinia(), i18n],
+        stubs: {
+          SystemMenuShell: {
+            props: ['visible'],
+            template: '<div v-if="visible"><slot /></div>',
+          },
+          SystemMenuLoadTab: { template: '<div>PROTECTED LOAD</div>' },
+          SystemMenuSettingsTab: {
+            props: ['readonly'],
+            template: '<div class="settings-stub" :data-readonly="readonly">READONLY SETTINGS</div>',
+          },
+        },
+        directives: { sound: () => {} },
+      },
+    })
+
+    expect(wrapper.text()).not.toContain('PROTECTED LOAD')
+    expect(wrapper.text()).toContain('READONLY SETTINGS')
+    expect(wrapper.get('.settings-stub').attributes('data-readonly')).toBe('true')
+  })
 })

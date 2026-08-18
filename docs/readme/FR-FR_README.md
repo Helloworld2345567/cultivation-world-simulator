@@ -147,6 +147,8 @@ Frontend : `http://localhost:8123`
 
 Le conteneur backend persiste les données utilisateur avec `CWS_DATA_DIR=/data` : paramètres, secrets, sauvegardes et logs. Par défaut, ces données sont montées dans `./docker-data` sur l'hôte et survivent à un `docker compose down` suivi d'un nouveau `up`.
 
+Pour une publication sécurisée, utilisez le fichier dédié `docker-compose.cloudflare.yml`. Le domaine par défaut est `world.ym0v0.com` : le backend n'expose aucun port hôte, le frontend écoute uniquement sur `127.0.0.1:8123` et tout le trafic public passe par le sidecar Cloudflare Tunnel. Configurez l'authentification administrateur et les identifiants du Tunnel avant le déploiement ; consultez le [guide Cloudflare Tunnel](../cloudflare-tunnel-deployment.md).
+
 <details>
 <summary><b>Accès réseau local / mobile (cliquer pour ouvrir)</b></summary>
 

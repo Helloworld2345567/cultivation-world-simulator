@@ -48,6 +48,21 @@
   "about_contributors_desc": "このオープンソースプロジェクトに参加してくれたすべての制作者に感謝します。",
   "auto_save": "自動保存",
   "auto_save_desc": "十年ごとの一月に自動で保存します",
+  "admin_auth": {
+    "visitor_status": "閲覧者・読み取り専用",
+    "admin_status": "管理者・編集可能",
+    "local_status": "ローカル管理モード",
+    "password_label": "管理者パスワード",
+    "password_placeholder": "管理者パスワードを入力",
+    "login": "ログイン",
+    "logging_in": "ログイン中…",
+    "logout": "管理者モードを終了",
+    "logging_out": "ログアウト中…",
+    "admin_hint": "現在、この世界を編集・操作できます。",
+    "read_only_hint": "閲覧者は世界の観察のみ可能です。この操作には管理者ログインが必要です。",
+    "login_failed": "ログインに失敗しました。管理者パスワードを確認してください。",
+    "logout_failed": "ログアウトに失敗しました。後でもう一度お試しください。"
+  },
   "create_avatar": {
     "fetch_failed": "ゲームデータの取得に失敗しました",
     "create_success": "キャラクターを作成しました",

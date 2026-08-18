@@ -7,6 +7,46 @@
 const API_BASE = import.meta.env.VITE_API_TARGET || '';
 const DEFAULT_TIMEOUT_MS = 30000;
 const REQUEST_TIMEOUT_REASON = 'cws-request-timeout';
+const SAFE_METHODS = new Set(['GET', 'HEAD', 'OPTIONS']);
+let csrfToken: string | null = null;
+let adminAuthRequiredHandler: (() => void) | null = null;
+
+export function setCsrfToken(token: string | null): void {
+  csrfToken = token;
+}
+
+export function setAdminAuthRequiredHandler(handler: (() => void) | null): void {
+  adminAuthRequiredHandler = handler;
+}
+
+function getApiErrorCode(errorData: unknown): string | null {
+  if (!errorData || typeof errorData !== 'object' || !('detail' in errorData)) return null;
+  const detail = (errorData as { detail?: unknown }).detail;
+  if (!detail || typeof detail !== 'object' || !('code' in detail)) return null;
+  const code = (detail as { code?: unknown }).code;
+  return typeof code === 'string' ? code : null;
+}
+
+function addCsrfHeader(headers: HeadersInit | undefined, method: string): HeadersInit | undefined {
+  if (!csrfToken || SAFE_METHODS.has(method)) {
+    return headers;
+  }
+
+  if (headers instanceof Headers) {
+    const nextHeaders = new Headers(headers);
+    nextHeaders.set('X-CSRF-Token', csrfToken);
+    return nextHeaders;
+  }
+
+  if (Array.isArray(headers)) {
+    return [...headers, ['X-CSRF-Token', csrfToken]];
+  }
+
+  return {
+    ...headers,
+    'X-CSRF-Token': csrfToken,
+  };
+}
 
 export interface HttpRequestOptions {
   timeoutMs?: number;
@@ -31,6 +71,7 @@ async function request<T>(
   requestOptions: HttpRequestOptions = {},
 ): Promise<T> {
   const url = `${API_BASE}${path}`;
+  const method = (options.method ?? 'GET').toUpperCase();
   const controller = new AbortController();
   const timeoutMs = requestOptions.timeoutMs ?? DEFAULT_TIMEOUT_MS;
   let didTimeout = false;
@@ -55,6 +96,8 @@ async function request<T>(
   try {
     response = await fetch(url, {
       ...options,
+      credentials: options.credentials ?? 'include',
+      headers: addCsrfHeader(options.headers, method),
       signal: controller.signal,
     });
   } catch (error) {
@@ -90,6 +133,10 @@ async function request<T>(
       }
     } catch {
       // 如果解析失败，使用默认错误消息
+    }
+
+    if (response.status === 401 && getApiErrorCode(errorData) === 'ADMIN_AUTH_REQUIRED') {
+      adminAuthRequiredHandler?.();
     }
     
     throw new ApiError(response.status, errorMessage, errorData);

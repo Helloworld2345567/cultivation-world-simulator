@@ -230,7 +230,18 @@ def is_idle_shutdown_enabled() -> bool:
     raw = os.environ.get("CWS_DISABLE_AUTO_SHUTDOWN", "")
     return raw.strip().lower() not in {"1", "true", "yes", "on"}
 
-manager = ConnectionManager(runtime=runtime, is_idle_shutdown_enabled=is_idle_shutdown_enabled)
+
+def is_auto_pause_enabled() -> bool:
+    """Return whether the world should pause after the last client disconnects."""
+    raw = os.environ.get("CWS_DISABLE_AUTO_PAUSE", "")
+    return raw.strip().lower() not in {"1", "true", "yes", "on"}
+
+
+manager = ConnectionManager(
+    runtime=runtime,
+    is_idle_shutdown_enabled=is_idle_shutdown_enabled,
+    is_auto_pause_enabled=is_auto_pause_enabled,
+)
 static_data = build_static_game_data_registry()
 sects_by_id = static_data.sects_by_id
 races_by_id = static_data.races_by_id

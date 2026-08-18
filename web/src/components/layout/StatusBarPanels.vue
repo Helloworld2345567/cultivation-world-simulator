@@ -1,8 +1,9 @@
 <script setup lang="ts">
-import { computed, defineAsyncComponent, ref } from 'vue'
+import { computed, defineAsyncComponent, ref, watch } from 'vue'
 import type { Component } from 'vue'
 
 import { useAvatarOverviewStore } from '@/stores/avatarOverview'
+import { useAuthStore } from '@/stores/auth'
 import PhenomenonSelectorModal from '@/components/game/panels/PhenomenonSelectorModal.vue'
 
 const RankingModal = defineAsyncComponent(() => import('@/components/game/panels/RankingModal.vue'))
@@ -30,10 +31,12 @@ type StatusBarPanelKey =
   | 'worldSecret'
 
 const avatarOverviewStore = useAvatarOverviewStore()
+const authStore = useAuthStore()
 
 type StatusBarPanelDefinition = {
   component: Component
   beforeOpen?: () => Promise<void> | void
+  requiresWrite?: boolean
 }
 
 const panelRegistry: Record<StatusBarPanelKey, StatusBarPanelDefinition> = {
@@ -45,7 +48,7 @@ const panelRegistry: Record<StatusBarPanelKey, StatusBarPanelDefinition> = {
   mortalOverview: { component: MortalOverviewModal },
   dynastyOverview: { component: DynastyOverviewModal },
   hiddenDomain: { component: HiddenDomainOverviewModal },
-  phenomenonSelector: { component: PhenomenonSelectorModal },
+  phenomenonSelector: { component: PhenomenonSelectorModal, requiresWrite: true },
   avatarOverview: {
     component: AvatarOverviewModal,
     async beforeOpen() {
@@ -59,7 +62,15 @@ const panelRegistry: Record<StatusBarPanelKey, StatusBarPanelDefinition> = {
 
 const activePanel = ref<StatusBarPanelKey | null>(null)
 const activePanelDefinition = computed(() => (
-  activePanel.value ? panelRegistry[activePanel.value] : null
+  activePanel.value
+    && (!panelRegistry[activePanel.value].requiresWrite || authStore.canWrite)
+    ? panelRegistry[activePanel.value]
+    : null
+))
+const activePanelProps = computed(() => (
+  activePanel.value && panelRegistry[activePanel.value].requiresWrite
+    ? { canWrite: authStore.canWrite }
+    : {}
 ))
 
 function closeActivePanel() {
@@ -67,9 +78,18 @@ function closeActivePanel() {
 }
 
 async function open(panel: StatusBarPanelKey) {
-  await panelRegistry[panel].beforeOpen?.()
+  const definition = panelRegistry[panel]
+  if (definition.requiresWrite && !authStore.canWrite) return
+  await definition.beforeOpen?.()
+  if (definition.requiresWrite && !authStore.canWrite) return
   activePanel.value = panel
 }
+
+watch(() => authStore.canWrite, (canWrite) => {
+  if (!canWrite && activePanel.value && panelRegistry[activePanel.value].requiresWrite) {
+    closeActivePanel()
+  }
+})
 
 defineExpose({ open })
 </script>
@@ -78,6 +98,7 @@ defineExpose({ open })
   <component
     :is="activePanelDefinition.component"
     v-if="activePanelDefinition"
+    v-bind="activePanelProps"
     :show="true"
     @update:show="value => { if (!value) closeActivePanel() }"
   />

@@ -145,6 +145,8 @@ docker-compose up -d --build
 
 後端容器透過 `CWS_DATA_DIR=/data` 統一持久化使用者資料，包含設定、密鑰、存檔與日誌。預設已映射到宿主機 `./docker-data`，即使執行 `docker compose down` 後重新 `up`，這些資料也會保留。
 
+如需安全發佈到公網，可使用獨立的 `docker-compose.cloudflare.yml`。預設網域為 `world.ym0v0.com`：後端不發佈主機連接埠，前端僅綁定 `127.0.0.1:8123`，公網流量統一經 Cloudflare Tunnel sidecar 進入；部署前必須設定管理員驗證與 Tunnel 憑據。完整步驟見 [Cloudflare Tunnel 公網部署](../cloudflare-tunnel-deployment.md)。
+
 <details>
 <summary><b>區域網路/手機訪問配置 (點擊展開)</b></summary>
 

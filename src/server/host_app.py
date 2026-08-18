@@ -8,7 +8,30 @@ from contextlib import asynccontextmanager
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from src.server.admin_auth import install_admin_auth
 from src.server.mounts import mount_static_apps
+
+
+_LOCAL_ORIGIN_REGEX = r"^https?://(?:localhost|127\.0\.0\.1)(?::\d+)?$"
+
+
+def _resolve_allowed_origins() -> tuple[list[str], str | None]:
+    configured = os.environ.get("CWS_ALLOWED_ORIGINS", "")
+    if not configured.strip():
+        return [], _LOCAL_ORIGIN_REGEX
+    origins = list(
+        dict.fromkeys(
+            origin.strip()
+            for origin in configured.split(",")
+            if origin.strip()
+        )
+    )
+    if "*" in origins:
+        raise RuntimeError(
+            "CWS_ALLOWED_ORIGINS must list explicit origins when credentialed "
+            "browser requests are enabled"
+        )
+    return origins, None
 
 
 def create_lifespan(
@@ -71,9 +94,12 @@ def create_llm_updated_handler(*, runtime, manager):
 
 def create_app(*, lifespan) -> FastAPI:
     app = FastAPI(lifespan=lifespan)
+    install_admin_auth(app)
+    allowed_origins, allowed_origin_regex = _resolve_allowed_origins()
     app.add_middleware(
         CORSMiddleware,
-        allow_origins=["*"],
+        allow_origins=allowed_origins,
+        allow_origin_regex=allowed_origin_regex,
         allow_credentials=True,
         allow_methods=["*"],
         allow_headers=["*"],

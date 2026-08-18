@@ -48,6 +48,21 @@
   "about_contributors_desc": "感謝所有參與了開源的創作者們！",
   "auto_save": "自動保存",
   "auto_save_desc": "每逢十年的 1 月自動進行存檔",
+  "admin_auth": {
+    "visitor_status": "遊客·唯讀",
+    "admin_status": "管理員·可編輯",
+    "local_status": "本機管理模式",
+    "password_label": "管理員密碼",
+    "password_placeholder": "輸入管理員密碼",
+    "login": "登入",
+    "logging_in": "登入中…",
+    "logout": "退出管理員",
+    "logging_out": "退出中…",
+    "admin_hint": "目前可以編輯和控制此世界。",
+    "read_only_hint": "遊客模式只能觀察世界，登入管理員後可執行此操作。",
+    "login_failed": "登入失敗，請檢查管理員密碼。",
+    "logout_failed": "退出失敗，請稍後再試。"
+  },
   "create_avatar": {
     "fetch_failed": "取得遊戲資料失敗",
     "create_success": "角色建立成功",

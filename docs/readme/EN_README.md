@@ -145,6 +145,8 @@ Visit frontend: `http://localhost:8123`
 
 The backend container persists user data through `CWS_DATA_DIR=/data`, including settings, secrets, saves, and logs. It is mapped to the host's `./docker-data` by default, so this data will be retained even if `docker compose down` is executed and then `up` again.
 
+For secure public hosting, use the dedicated `docker-compose.cloudflare.yml`. It defaults to `world.ym0v0.com`: the backend publishes no host port, the frontend binds only to `127.0.0.1:8123`, and all public traffic enters through the Cloudflare Tunnel sidecar. Configure administrator authentication and Tunnel credentials before deployment; see [Cloudflare Tunnel deployment](../cloudflare-tunnel-deployment.md).
+
 <details>
 <summary><b>LAN/Mobile Access Configuration (Click to expand)</b></summary>
 

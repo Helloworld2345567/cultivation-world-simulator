@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { mount } from '@vue/test-utils'
-import { defineComponent, nextTick } from 'vue'
+import { defineComponent, nextTick, ref, type Ref } from 'vue'
 import { useSystemStore } from '@/stores/system'
 import { useWorldStore } from '@/stores/world'
 import { useSocketStore } from '@/stores/socket'
@@ -57,7 +57,7 @@ const createMockStatus = (overrides: Partial<InitStatusDTO> = {}): InitStatusDTO
 })
 
 // Helper to create test component.
-const createTestComponent = (options: { onIdle?: () => void } = {}) => {
+const createTestComponent = (options: { onIdle?: () => void; ready?: Ref<boolean> } = {}) => {
   return defineComponent({
     setup() {
       const result = useGameInit(options)
@@ -147,6 +147,22 @@ describe('useGameInit', () => {
   })
 
   describe('lifecycle', () => {
+    it('waits for administrator session hydration before polling', async () => {
+      const ready = ref(false)
+      const TestComponent = createTestComponent({ ready })
+      const wrapper = mount(TestComponent)
+
+      await vi.advanceTimersByTimeAsync(2000)
+      expect(systemStore.fetchInitStatus).not.toHaveBeenCalled()
+
+      ready.value = true
+      await nextTick()
+      await vi.advanceTimersByTimeAsync(0)
+
+      expect(systemStore.fetchInitStatus).toHaveBeenCalledTimes(1)
+      wrapper.unmount()
+    })
+
     it('should disconnect socket on unmount', async () => {
       const disconnectSpy = vi.spyOn(socketStore, 'disconnect')
 
