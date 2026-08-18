@@ -131,21 +131,114 @@
 3. **访问前端**
    开发模式会自动拉起前端开发服务器，请访问启动日志中显示的前端地址，通常为 `http://localhost:5173`。
 
-### 方式二：Docker 一键部署（未测试）
+### 方式二：Docker 本地部署（从源码构建）
 
-无需配置环境，直接运行即可：
+适合在本机快速体验，或需要保留本地源码修改的场景：
 
 ```bash
-git clone https://github.com/4thfever/cultivation-world-simulator.git
+git clone https://github.com/Helloworld2345567/cultivation-world-simulator.git
 cd cultivation-world-simulator
-docker-compose up -d --build
+docker compose up -d --build
+docker compose ps
 ```
 
 访问前端：`http://localhost:8123`
 
-后端容器通过 `CWS_DATA_DIR=/data` 统一持久化用户数据，包含设置、密钥、存档和日志。默认已映射到宿主机 `./docker-data`，即使执行 `docker compose down` 后重新 `up`，这些数据也会保留。
+> 基础 `docker-compose.yml` 会把后端 `8002` 和前端 `8123` 端口绑定到所有宿主接口，而且默认不启用管理员鉴权；它只适合本机或受信任局域网。不要直接将这套配置暴露到公网，公网部署请使用方式四。
 
-如需安全发布到公网，可使用独立的 `docker-compose.cloudflare.yml`。默认域名为 `world.ym0v0.com`：后端不发布宿主端口，前端仅绑定 `127.0.0.1:8123`，公网流量统一经 Cloudflare Tunnel sidecar 进入；部署前必须配置管理员鉴权和 Tunnel 凭据。完整步骤见 [Cloudflare Tunnel 公网部署](docs/cloudflare-tunnel-deployment.md)。
+后端容器通过 `CWS_DATA_DIR=/data` 统一持久化用户数据，包含设置、密钥、存档和日志。默认已映射到宿主机 `./docker-data`，即使执行 `docker compose down` 后重新 `up`，这些数据也会保留。停止本地栈：
+
+```bash
+docker compose down
+```
+
+基础本地 Compose 从项目源码构建镜像；如果要把服务暴露给公网，请使用下面的 Cloudflare 方式，并为管理员鉴权配置独立的随机凭据。
+
+### 方式三：直接使用 Docker Hub 镜像
+
+对应的应用镜像已经发布到 Docker Hub：
+
+- [Backend 镜像](https://hub.docker.com/r/ym0v0/cultivation-world-simulator-backend)
+- [Frontend 镜像](https://hub.docker.com/r/ym0v0/cultivation-world-simulator-frontend)
+
+推荐使用固定提交标签 `sha-f26ff7e6`（请勿覆盖此标签）；`latest` 仅在后续手动发布时更新，仓库当前未配置 Docker Hub 自动发布。该标签目前仅提供 `linux/amd64` 镜像；Apple Silicon 或其他 ARM64 主机需要启用 amd64 模拟，否则请按方式二从源码构建。下面的示例使用 Docker Hub 镜像运行一套本地栈，前端 Nginx 通过网络别名 `backend` 连接后端。
+
+先在仓库外创建环境文件，其中 `CWS_ADMIN_PASSWORD` 必须是至少 12 个字符的随机密码，`CWS_ADMIN_SESSION_SECRET` 必须是至少 32 个字符的独立随机密钥。基础 Compose、Docker Hub 镜像栈和 Cloudflare 栈都会占用 `8123` 端口，切换运行方式前请先停止当前栈。
+
+Windows PowerShell：
+
+```powershell
+$CwsEnvFile = 'C:\Users\<你的用户名>\.config\cultivation-world\runtime.env'
+$ImageTag = 'sha-f26ff7e6'
+$Platform = 'linux/amd64'
+
+docker pull --platform $Platform "ym0v0/cultivation-world-simulator-backend:$ImageTag"
+docker pull --platform $Platform "ym0v0/cultivation-world-simulator-frontend:$ImageTag"
+docker network inspect cultivation-world-hub *> $null
+if ($LASTEXITCODE -ne 0) { docker network create cultivation-world-hub | Out-Null }
+docker run -d --platform $Platform --name cultivation-hub-backend `
+  --network cultivation-world-hub --network-alias backend `
+  --restart unless-stopped --env-file $CwsEnvFile `
+  -e CWS_DATA_DIR=/data -e CWS_DISABLE_AUTO_SHUTDOWN=1 `
+  -e CWS_ADMIN_COOKIE_SECURE=0 -v "${PWD}\docker-data:/data" `
+  "ym0v0/cultivation-world-simulator-backend:$ImageTag"
+docker run -d --platform $Platform --name cultivation-hub-frontend `
+  --network cultivation-world-hub --restart unless-stopped `
+  -p 127.0.0.1:8123:80 `
+  "ym0v0/cultivation-world-simulator-frontend:$ImageTag"
+
+docker ps
+```
+
+Linux/macOS：
+
+```bash
+CWS_ENV_FILE="$HOME/.config/cultivation-world/runtime.env"
+IMAGE_TAG="sha-f26ff7e6"
+PLATFORM="linux/amd64"
+
+docker pull --platform "$PLATFORM" "ym0v0/cultivation-world-simulator-backend:$IMAGE_TAG"
+docker pull --platform "$PLATFORM" "ym0v0/cultivation-world-simulator-frontend:$IMAGE_TAG"
+docker network inspect cultivation-world-hub >/dev/null 2>&1 || \
+  docker network create cultivation-world-hub
+docker run -d --platform "$PLATFORM" --name cultivation-hub-backend \
+  --network cultivation-world-hub --network-alias backend \
+  --restart unless-stopped --env-file "$CWS_ENV_FILE" \
+  -e CWS_DATA_DIR=/data -e CWS_DISABLE_AUTO_SHUTDOWN=1 \
+  -e CWS_ADMIN_COOKIE_SECURE=0 -v "$PWD/docker-data:/data" \
+  "ym0v0/cultivation-world-simulator-backend:$IMAGE_TAG"
+docker run -d --platform "$PLATFORM" --name cultivation-hub-frontend \
+  --network cultivation-world-hub --restart unless-stopped \
+  -p 127.0.0.1:8123:80 \
+  "ym0v0/cultivation-world-simulator-frontend:$IMAGE_TAG"
+
+docker ps
+```
+
+后端首次启动可能需要几十秒。等待容器稳定后访问 `http://127.0.0.1:8123`，并用 `http://127.0.0.1:8123/api/health` 检查代理链路。本地示例显式设置 `CWS_ADMIN_COOKIE_SECURE=0`，否则浏览器不会在 HTTP 连接中回传管理员会话 Cookie。停止这套镜像栈：
+
+```bash
+docker rm -f cultivation-hub-frontend cultivation-hub-backend
+docker network rm cultivation-world-hub
+```
+
+不要把管理员密码、会话签名密钥或 Tunnel token 写进 README、命令历史或仓库；公网 HTTPS 场景请将 `CWS_ADMIN_COOKIE_SECURE` 设为 `1`。
+
+### 方式四：Cloudflare 公网部署
+
+公网部署地址为 [https://world.ym0v0.com](https://world.ym0v0.com)。游客可以公开只读访问；点击页面上的“游客·只读”并输入管理员密码后，管理员才可以创建角色和执行世界写操作。
+
+如需安全发布到公网，先克隆本仓库并进入项目根目录，再使用独立的 `docker-compose.cloudflare.yml`。后端不发布宿主端口，前端仅绑定 `127.0.0.1:8123`，公网流量统一经 Cloudflare Tunnel sidecar 进入。部署前以 `deploy/cloudflare.env.example` 为模板，在仓库外准备环境文件，填写管理员密码、会话签名密钥和 Tunnel token：
+
+```powershell
+$CwsEnvFile = 'C:\Users\<你的用户名>\.config\cultivation-world\cloudflare.env'
+
+docker compose --env-file $CwsEnvFile -f docker-compose.cloudflare.yml config --quiet
+docker compose --env-file $CwsEnvFile -f docker-compose.cloudflare.yml up -d --build
+docker compose --env-file $CwsEnvFile -f docker-compose.cloudflare.yml ps
+```
+
+当前公网 Compose 默认从源码构建 backend/frontend，以确保部署配置与代码版本一致；Docker Hub 镜像可用于独立主机或自定义的 image-based Compose。完整的 Tunnel、DNS、凭据轮换和验证步骤见 [Cloudflare Tunnel 公网部署](docs/cloudflare-tunnel-deployment.md)。
 
 <details>
 <summary><b>局域网/手机访问配置 (点击展开)</b></summary>
