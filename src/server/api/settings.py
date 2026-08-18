@@ -10,6 +10,23 @@ from src.utils.llm.connectivity import check_llm_profile_connectivity
 from src.utils.llm.validation import is_llm_runtime_configured
 
 
+_PUBLIC_SETTINGS_FIELDS = (
+    "schema_version",
+    "ui",
+    "simulation",
+    "new_game_defaults",
+)
+
+
+def _build_public_settings_payload(
+    settings: object,
+    *,
+    model_to_dict: Callable[[object], dict],
+) -> dict:
+    payload = model_to_dict(settings)
+    return {field: payload[field] for field in _PUBLIC_SETTINGS_FIELDS}
+
+
 def create_settings_router(
     *,
     model_to_dict: Callable[[object], dict],
@@ -28,7 +45,10 @@ def create_settings_router(
 
     @router.get("/api/settings")
     def get_settings():
-        return model_to_dict(get_settings_view())
+        return _build_public_settings_payload(
+            get_settings_view(),
+            model_to_dict=model_to_dict,
+        )
 
     @router.patch("/api/settings")
     def patch_settings_endpoint(req: AppSettingsPatch):

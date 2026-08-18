@@ -368,6 +368,21 @@ def test_settings_patch_api_returns_200_when_router_serializes_model(monkeypatch
     assert applied_locales == [get_fallback_locale()]
 
 
+def test_public_settings_api_excludes_llm_configuration():
+    from src.server import main
+
+    client = TestClient(main.app)
+    response = client.get("/api/settings")
+
+    assert response.status_code == 200
+    payload = response.json()
+    assert "llm" not in payload
+    assert payload["schema_version"] == 2
+    assert "ui" in payload
+    assert "simulation" in payload
+    assert "new_game_defaults" in payload
+
+
 def test_health_api_is_available_before_game_start():
     from src.server import main
 

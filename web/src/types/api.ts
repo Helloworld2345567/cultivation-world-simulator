@@ -393,9 +393,6 @@ export interface AppSettingsDTO {
   schema_version: number;
   ui: UISettingsDTO;
   simulation: SimulationSettingsDTO;
-  llm: {
-    profile: LLMConfigViewDTO;
-  };
   new_game_defaults: RunConfigDTO;
 }
 
