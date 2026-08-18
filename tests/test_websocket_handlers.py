@@ -282,7 +282,7 @@ class TestWebSocketEndpoint:
             assert json.loads(response) == {"type": "pong"}
 
     def test_websocket_llm_config_required_on_connect(self, client, reset_game_instance):
-        """Test WebSocket sends llm_config_required when LLM check failed."""
+        """Public WebSocket redacts recorded LLM failure details on connect."""
         game_instance["llm_check_failed"] = True
         game_instance["llm_error_message"] = "API key invalid"
 
@@ -292,7 +292,8 @@ class TestWebSocketEndpoint:
             data = json.loads(response)
 
             assert data["type"] == "llm_config_required"
-            assert data["error"] == "API key invalid"
+            assert data["error"] == "LLM configuration requires administrator attention."
+            assert "API key invalid" not in response
 
     def test_websocket_no_llm_message_when_ok(self, client, reset_game_instance):
         """Test WebSocket doesn't send llm_config_required when LLM is OK."""

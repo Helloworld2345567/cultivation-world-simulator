@@ -5,7 +5,11 @@ from typing import Any, Callable
 from fastapi import Query
 
 from src.i18n import t
-from src.server.services.public_api_contract import raise_public_error
+from src.server.services.public_api_contract import (
+    PUBLIC_INITIALIZATION_ERROR_MESSAGE,
+    PUBLIC_LLM_CONFIG_REQUIRED_MESSAGE,
+    raise_public_error,
+)
 from src.systems.cultivation_display import build_avatar_cultivation_display
 
 
@@ -13,6 +17,8 @@ def get_runtime_status(runtime, version: str) -> dict[str, Any]:
     from src.server.services.roleplay_service import get_roleplay_session as build_roleplay_session
 
     start_time = runtime.get("init_start_time")
+    init_error = runtime.get("init_error")
+    llm_check_failed = bool(runtime.get("llm_check_failed", False))
     elapsed = 0.0
     if start_time:
         import time
@@ -25,10 +31,12 @@ def get_runtime_status(runtime, version: str) -> dict[str, Any]:
         "phase_name": runtime.get("init_phase_name", ""),
         "progress": runtime.get("init_progress", 0),
         "elapsed_seconds": round(elapsed, 1),
-        "error": runtime.get("init_error"),
+        "error": PUBLIC_INITIALIZATION_ERROR_MESSAGE if init_error else None,
         "version": version,
-        "llm_check_failed": runtime.get("llm_check_failed", False),
-        "llm_error_message": runtime.get("llm_error_message", ""),
+        "llm_check_failed": llm_check_failed,
+        "llm_error_message": (
+            PUBLIC_LLM_CONFIG_REQUIRED_MESSAGE if llm_check_failed else ""
+        ),
         "llm_check_pending": runtime.get("llm_check_pending", False),
         "is_paused": runtime.is_effectively_paused() if hasattr(runtime, "is_effectively_paused") else runtime.get("is_paused", True),
         "pause_reason": runtime.get_pause_reason() if hasattr(runtime, "get_pause_reason") else ("paused" if runtime.get("is_paused", True) else ""),

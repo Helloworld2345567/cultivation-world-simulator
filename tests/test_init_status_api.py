@@ -97,19 +97,21 @@ class TestInitStatusEndpoint:
         assert data["progress"] == 100
 
     def test_init_status_error(self, client, reset_game_instance):
-        """Test init-status when initialization failed."""
+        """Public init status redacts the recorded initialization failure detail."""
         game_instance["init_status"] = "error"
-        game_instance["init_error"] = "LLM connection failed"
+        game_instance["init_error"] = "C:\\private\\provider\\response.json: bearer-secret"
         
         response = client.get("/api/v1/query/runtime/status")
         assert response.status_code == 200
         
         data = response.json()["data"]
         assert data["status"] == "error"
-        assert data["error"] == "LLM connection failed"
+        assert data["error"] == "Initialization failed. Administrator attention is required."
+        assert "bearer-secret" not in response.text
+        assert "private" not in response.text
 
     def test_init_status_llm_check_failed(self, client, reset_game_instance):
-        """Test init-status includes LLM check status."""
+        """Public init status redacts the recorded LLM failure detail."""
         game_instance["init_status"] = "ready"
         game_instance["llm_check_failed"] = True
         game_instance["llm_error_message"] = "API key invalid"
@@ -119,7 +121,8 @@ class TestInitStatusEndpoint:
         
         data = response.json()["data"]
         assert data["llm_check_failed"] is True
-        assert data["llm_error_message"] == "API key invalid"
+        assert data["llm_error_message"] == "LLM configuration requires administrator attention."
+        assert "API key invalid" not in response.text
 
 
 class TestUpdateInitProgress:

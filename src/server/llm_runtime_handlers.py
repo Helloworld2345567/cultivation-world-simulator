@@ -3,6 +3,7 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Any, Callable
 
+from src.server.services.public_api_contract import PUBLIC_LLM_CONFIG_REQUIRED_MESSAGE
 from src.utils.llm.connectivity import check_llm_profile_connectivity
 
 
@@ -44,7 +45,7 @@ def create_llm_runtime_handlers(
         await manager.broadcast(
             {
                 "type": "llm_config_required",
-                "error": error_message,
+                "error": PUBLIC_LLM_CONFIG_REQUIRED_MESSAGE,
             }
         )
 
